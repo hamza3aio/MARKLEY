@@ -34,6 +34,7 @@ const tabs = [
   { id: 'overview', label: 'Dashboard' },
   { id: 'classes', label: 'Classes' },
   { id: 'assignments', label: 'Assignments' },
+  { id: 'calendar', label: 'Calendar' },
   { id: 'invitations', label: 'Invitations' },
 ];
 if (['parent', 'teacher', 'admin'].includes(profile.role)) tabs.push({ id: 'students', label: 'Students' });
@@ -56,6 +57,50 @@ function renderNav() {
 }
 renderNav();
 
+// ---- Notifications bell --------------------------------------------------------
+const bellBtn = document.getElementById('bell');
+const bellPanel = document.getElementById('bellPanel');
+const bellCount = document.getElementById('bellCount');
+async function refreshBell() {
+  try {
+    const { notifications, unread } = await api.notifications();
+    bellCount.style.display = unread ? '' : 'none';
+    bellCount.textContent = String(Math.min(unread, 99));
+    bellPanel.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b>Notifications</b><div style="flex:1"></div>
+      ${unread ? '<button class="btn secondary" id="markAll">Mark all read</button>' : ''}</div>
+      ${notifications.length ? notifications.map((n) => `
+        <div style="padding:8px;border-top:1px solid var(--border);${n.read_at ? 'opacity:.65' : ''}">
+          <div><b>${esc(n.title)}</b></div>
+          ${n.body ? `<div style="font-size:13px;color:var(--muted)">${esc(n.body)}</div>` : ''}
+          <div style="font-size:12px;color:var(--muted)">${esc(new Date(n.created_at).toLocaleString())}</div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            ${n.link && n.link.startsWith('/') ? `<a href="${esc(n.link)}">Open</a>` : ''}
+            ${!n.read_at ? `<a href="#" data-read="${esc(n.id)}">Mark read</a>` : ''}
+          </div></div>`).join('') : '<div class="empty">No notifications.</div>'}`;
+    bellPanel.querySelector('#markAll')?.addEventListener('click', async () => {
+      await api.notifRead({ all: true }).catch((e) => toast(e.message));
+      refreshBell();
+    });
+    bellPanel.querySelectorAll('[data-read]').forEach((a) => (a.onclick = async (e) => {
+      e.preventDefault();
+      await api.notifRead({ ids: [a.dataset.read] }).catch((err) => toast(err.message));
+      refreshBell();
+    }));
+  } catch { /* offline-safe */ }
+}
+bellBtn.onclick = (e) => {
+  e.stopPropagation();
+  const open = bellPanel.style.display !== 'none';
+  bellPanel.style.display = open ? 'none' : 'block';
+  if (!open) refreshBell();
+};
+document.addEventListener('click', (e) => {
+  if (!bellPanel.contains(e.target)) bellPanel.style.display = 'none';
+});
+refreshBell();
+setInterval(refreshBell, 120000);
+
 async function authed(path, opts = {}) {
   const r = await fetch(path, {
     ...opts,
@@ -70,6 +115,7 @@ async function render() {
   if (current === 'overview') return renderOverview();
   if (current === 'classes') return renderClasses();
   if (current === 'assignments') return renderAssignmentsHome();
+  if (current === 'calendar') return renderCalendar();
   if (current === 'invitations') return renderInvitations();
   if (current === 'students') return renderStudents();
   if (current === 'activity') return renderActivity();
@@ -199,7 +245,15 @@ async function renderClassDetail(id) {
         ${isStaff && can('reports.export') ? `<button class="btn secondary" id="expG">Grades .xlsx</button>
         <button class="btn secondary" id="expA">Attendance .xlsx</button>
         <button class="btn secondary" id="expR">Full report</button>` : ''}</div>
-        <div id="anaBox" style="margin-top:8px"></div></section>`;
+        <div id="anaBox" style="margin-top:8px"></div></section>
+      <section class="card"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <h3 style="margin:0">Live sessions</h3><div style="flex:1"></div>
+        ${isStaff ? '<button class="btn" id="newSes">New session</button>' : ''}</div>
+        <div id="sesBox" style="margin-top:8px"></div></section>
+      <section class="card"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <h3 style="margin:0">Events</h3><div style="flex:1"></div>
+        ${isStaff ? '<button class="btn secondary" id="newEv">New event</button>' : ''}</div>
+        <div id="evBox" style="margin-top:8px"></div></section>`;
     document.getElementById('back').onclick = () => { openClassId = null; render(); };
     document.getElementById('editBtn')?.addEventListener('click', () => showEditClass(c));
     document.getElementById('delBtn')?.addEventListener('click', async () => {
@@ -258,6 +312,10 @@ async function renderClassDetail(id) {
     document.getElementById('expG')?.addEventListener('click', dl('grades'));
     document.getElementById('expA')?.addEventListener('click', dl('attendance'));
     document.getElementById('expR')?.addEventListener('click', dl('report'));
+    document.getElementById('newSes')?.addEventListener('click', () => showNewSession(c.id));
+    document.getElementById('newEv')?.addEventListener('click', () => showNewEvent(c.id));
+    loadSessionsSection(c.id, isStaff);
+    loadEventsSection(c.id);
   } catch (e) { main.innerHTML = stateRow('error', e.message); }
 }
 
@@ -642,6 +700,173 @@ function showEditAssignment(a) {
   };
 }
 
+// ---- Sessions + events (Phase 5) ------------------------------------------------------
+async function loadSessionsSection(classId, isStaff) {
+  const box = document.getElementById('sesBox');
+  if (!box) return;
+  box.innerHTML = stateRow('loading', 'Loading sessions…');
+  try {
+    const { sessions } = await api.sessions(classId);
+    if (!sessions.length) { box.innerHTML = stateRow('empty', 'No sessions scheduled.'); return; }
+    const now = Date.now();
+    box.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Session</th><th>Starts</th><th>Provider</th><th></th></tr></thead><tbody>
+      ${sessions.map((s) => {
+        const live = new Date(s.start_at).getTime() <= now && now <= new Date(s.end_at).getTime();
+        return `<tr><td>${esc(s.title)} ${live ? '<span class="badge success">live now</span>' : ''}<br><small style="color:var(--muted)">${esc(s.description || '')}</small></td>
+        <td>${esc(new Date(s.start_at).toLocaleString())}</td><td>${esc(s.provider)}</td>
+        <td style="white-space:nowrap">${s.meeting_url ? `<a class="btn" href="${esc(s.meeting_url)}" target="_blank" rel="noopener">Join session</a>` : '<span style="color:var(--muted)">No link</span>'}
+        ${isStaff ? ` <button class="btn ghost" data-delses="${esc(s.id)}">Delete</button>` : ''}</td></tr>`;
+      }).join('')}</tbody></table></div>`;
+    box.querySelectorAll('[data-delses]').forEach((b) => (b.onclick = async () => {
+      if (!confirm('Delete this session?')) return;
+      try { await api.sessionDelete(b.dataset.delses); toast('Session deleted.'); render(); }
+      catch (e) { toast(e.message); }
+    }));
+  } catch (e) { box.innerHTML = stateRow('error', e.message); }
+}
+
+function toLocalInput(iso) {
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function showNewSession(classId) {
+  const start = new Date(Date.now() + 3600000);
+  const end = new Date(Date.now() + 2 * 3600000);
+  main.innerHTML = `
+    <section class="card"><h2 style="margin-top:0">New live session</h2>
+      <p style="color:var(--muted)">Video runs on your meeting provider (Zoom, Teams, Meet). Students click Join session to open your link.</p>
+      <form id="sf" class="form">
+        <label class="field">Title<input class="input" id="stitle" required minlength="3" maxlength="200"></label>
+        <label class="field">Description<textarea class="input" id="sdesc" rows="2" maxlength="2000"></textarea></label>
+        <div class="grid cols-3">
+          <label class="field">Starts<input class="input" id="sstart" type="datetime-local" required value="${toLocalInput(start.toISOString())}"></label>
+          <label class="field">Ends<input class="input" id="send" type="datetime-local" required value="${toLocalInput(end.toISOString())}"></label>
+          <label class="field">Provider<select class="input" id="sprov"><option value="zoom">Zoom</option><option value="teams">Microsoft Teams</option><option value="meet">Google Meet</option><option value="other">Other</option></select></label>
+        </div>
+        <label class="field">Meeting link (https://)<input class="input" id="surl" type="url" placeholder="https://…"></label>
+        <div style="display:flex;gap:8px"><button class="btn" type="submit">Create</button>
+        <button class="btn secondary" type="button" id="cancel">Cancel</button></div>
+      </form></section>`;
+  document.getElementById('cancel').onclick = () => render();
+  document.getElementById('sf').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.sessionCreate(classId, {
+        title: document.getElementById('stitle').value,
+        description: document.getElementById('sdesc').value,
+        start_at: new Date(document.getElementById('sstart').value).toISOString(),
+        end_at: new Date(document.getElementById('send').value).toISOString(),
+        provider: document.getElementById('sprov').value,
+        meeting_url: document.getElementById('surl').value,
+      });
+      toast('Session created. Members were notified.');
+      render();
+    } catch (err) { toast(err.message); }
+  };
+}
+
+async function loadEventsSection(classId) {
+  const box = document.getElementById('evBox');
+  if (!box) return;
+  box.innerHTML = stateRow('loading', 'Loading events…');
+  try {
+    const { events } = await api.events(classId);
+    box.innerHTML = !events.length ? stateRow('empty', 'No events.') : `
+      <div class="table-wrap"><table><thead><tr><th>Event</th><th>Type</th><th>Starts</th><th></th></tr></thead><tbody>
+      ${events.map((v) => `<tr><td>${esc(v.title)}</td><td><span class="badge">${esc(v.type)}</span></td>
+      <td>${esc(new Date(v.start_at).toLocaleString())}</td>
+      <td>${v.link ? `<a href="${esc(v.link)}" target="_blank" rel="noopener">Open</a>` : ''}</td></tr>`).join('')}
+      </tbody></table></div>`;
+  } catch (e) { box.innerHTML = stateRow('error', e.message); }
+}
+
+function showNewEvent(classId) {
+  main.innerHTML = `
+    <section class="card"><h2 style="margin-top:0">New event</h2>
+      <form id="vf" class="form">
+        <label class="field">Title<input class="input" id="vtitle" required minlength="3" maxlength="200"></label>
+        <div class="grid cols-3">
+          <label class="field">Type<select class="input" id="vtype"><option value="event">Event</option><option value="exam">Exam</option><option value="deadline">Deadline</option></select></label>
+          <label class="field">Starts<input class="input" id="vstart" type="datetime-local" required></label>
+          <label class="field">Ends (optional)<input class="input" id="vend" type="datetime-local"></label>
+        </div>
+        <label class="field">Link (optional)<input class="input" id="vlink" type="url" placeholder="https://…"></label>
+        <label class="field">Description<textarea class="input" id="vdesc" rows="2" maxlength="2000"></textarea></label>
+        <div style="display:flex;gap:8px"><button class="btn" type="submit">Create</button>
+        <button class="btn secondary" type="button" id="cancel">Cancel</button></div>
+      </form></section>`;
+  document.getElementById('cancel').onclick = () => render();
+  document.getElementById('vf').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const endV = document.getElementById('vend').value;
+      await api.eventCreate(classId, {
+        title: document.getElementById('vtitle').value,
+        type: document.getElementById('vtype').value,
+        start_at: new Date(document.getElementById('vstart').value).toISOString(),
+        end_at: endV ? new Date(endV).toISOString() : null,
+        link: document.getElementById('vlink').value,
+        description: document.getElementById('vdesc').value,
+      });
+      toast('Event created.');
+      render();
+    } catch (err) { toast(err.message); }
+  };
+}
+
+// ---- Calendar (Phase 5) ----------------------------------------------------------------
+let calCursor = new Date();
+function renderCalendar() {
+  const y = calCursor.getFullYear(), m = calCursor.getMonth();
+  const first = new Date(y, m, 1);
+  const startPad = (first.getDay() + 6) % 7; // Monday-first
+  const days = new Date(y, m + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < startPad; i++) cells.push(null);
+  for (let d = 1; d <= days; d++) cells.push(new Date(y, m, d));
+  const monthName = first.toLocaleString('en', { month: 'long', year: 'numeric' });
+  main.innerHTML = `
+    <section class="card" style="display:flex;align-items:center;gap:8px">
+      <button class="btn secondary" id="calPrev">←</button>
+      <h2 style="margin:0;flex:1;text-align:center">${esc(monthName)}</h2>
+      <button class="btn secondary" id="calNext">→</button></section>
+    <section class="card"><div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+      ${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => `<b style="font-size:12px;color:var(--muted)">${d}</b>`).join('')}
+      ${cells.map((d) => d ? `<div data-day="${d.toISOString().slice(0, 10)}" style="min-height:88px;border:1px solid var(--border);border-radius:8px;padding:4px;font-size:12px"><b>${d.getDate()}</b><div class="cev"></div></div>` : '<div></div>').join('')}
+    </div></section>
+    <section class="card"><h3 style="margin-top:0">Upcoming</h3><div id="calUp"></div></section>`;
+  document.getElementById('calPrev').onclick = () => { calCursor = new Date(y, m - 1, 1); render(); };
+  document.getElementById('calNext').onclick = () => { calCursor = new Date(y, m + 1, 1); render(); };
+  loadCalendarItems(new Date(y, m, 1).toISOString(), new Date(y, m + 1, 0, 23, 59, 59).toISOString());
+}
+
+const KIND_COLOR = { session: '#2563eb', event: '#0ea5e9', exam: '#d97706', deadline: '#dc2626' };
+async function loadCalendarItems(from, to) {
+  try {
+    const { items } = await api.calendar(from, to);
+    const byDay = {};
+    items.forEach((it) => {
+      const k = new Date(it.start).toISOString().slice(0, 10);
+      (byDay[k] = byDay[k] || []).push(it);
+    });
+    document.querySelectorAll('#calGrid [data-day]').forEach((cell) => {
+      const list = (byDay[cell.dataset.day] || []).slice(0, 3);
+      cell.querySelector('.cev').innerHTML = list.map((it) =>
+        `<div title="${esc(it.title)}" style="border-left:3px solid ${KIND_COLOR[it.kind] || '#64748b'};padding-left:4px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(it.title)}</div>`).join('')
+        + ((byDay[cell.dataset.day] || []).length > 3 ? `<div style="color:var(--muted)">+${(byDay[cell.dataset.day] || []).length - 3} more</div>` : '');
+    });
+    const up = items.filter((it) => new Date(it.start).getTime() >= Date.now() - 86400000).slice(0, 20);
+    document.getElementById('calUp').innerHTML = up.length ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>What</th><th>Class</th></tr></thead><tbody>
+      ${up.map((it) => `<tr><td>${esc(new Date(it.start).toLocaleString())}</td>
+      <td><span class="badge">${esc(it.kind)}</span> ${it.link ? `<a href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>` : esc(it.title)}</td>
+      <td>${esc(it.class_name)}</td></tr>`).join('')}</tbody></table></div>` : stateRow('empty', 'Nothing upcoming.');
+  } catch (e) {
+    document.getElementById('calUp').innerHTML = stateRow('error', e.message);
+  }
+}
+
 // ---- Attendance + analytics (Phase 4) ------------------------------------------------
 async function loadAttendanceSection(classId, myRole, members) {
   const box = document.getElementById('attBox');
@@ -761,12 +986,13 @@ function renderSettings() {
           <label class="field">Mode<select class="input" id="mode"><option value="light" ${t.mode === 'light' ? 'selected' : ''}>Light</option><option value="dark" ${t.mode === 'dark' ? 'selected' : ''}>Dark</option></select></label>
         </div>
         <button class="btn" type="submit">Save</button>
+        <label style="font-size:14px;display:flex;gap:8px;align-items:center"><input type="checkbox" id="emailNotif" ${profile.email_notifications === false ? '' : 'checked'}> Email notifications</label>
       </form></section>`;
   document.getElementById('themeForm').onsubmit = async (e) => {
     e.preventDefault();
     const theme = { primary: document.getElementById('c1').value, secondary: document.getElementById('c2').value, mode: document.getElementById('mode').value };
     try {
-      const b = await authed('/api/profile', { method: 'PATCH', body: JSON.stringify({ full_name: document.getElementById('fullName').value, theme }) });
+      const b = await authed('/api/profile', { method: 'PATCH', body: JSON.stringify({ full_name: document.getElementById('fullName').value, theme, email_notifications: document.getElementById('emailNotif').checked }) });
       Object.assign(profile, b.profile);
       applyTheme(theme);
       try { localStorage.setItem('markley.theme', JSON.stringify(theme)); } catch { /* ignore */ }

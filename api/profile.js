@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   const token = getBearer(req);
   if (!token) return res.status(401).json({ error: 'Not authenticated.' });
 
-  const { full_name, theme } = req.body || {};
+  const { full_name, theme, email_notifications } = req.body || {};
   const patch = {};
   if (full_name !== undefined) {
     if (typeof full_name !== 'string' || full_name.trim().length > 120) {
@@ -35,6 +35,10 @@ export default async function handler(req, res) {
     }
     patch.theme = { primary: theme.primary, secondary: theme.secondary, mode: theme.mode };
   }
+  if (email_notifications !== undefined) {
+    if (typeof email_notifications !== 'boolean') return res.status(400).json({ error: 'Invalid request.' });
+    patch.email_notifications = email_notifications;
+  }
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update.' });
 
   try {
@@ -46,7 +50,7 @@ export default async function handler(req, res) {
     if (!cur || cur.status !== 'active') return res.status(403).json({ error: 'Account is not active.' });
 
     const { data, error } = await admin.from('profiles').update(patch).eq('id', user.id)
-      .select('id,email,full_name,role,status,theme').single();
+      .select('id,email,full_name,role,status,theme,email_notifications').single();
     if (error) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
 
     await admin.from('activity_logs').insert({

@@ -8,6 +8,7 @@
    - `database/migrations/002_phase2_classes.sql` (Phase 2: classes, members, invitations, parent links)
    - `database/migrations/003_phase3_files_assignments.sql` (Phase 3: files, assignments, submissions + private buckets)
    - `database/migrations/004_phase4_grading_attendance.sql` (Phase 4: grades, attendance)
+   - `database/migrations/005_phase5_sessions_notifications.sql` (Phase 5: sessions, events, notifications)
 3. Authentication > Providers > Email: ON, **Confirm email: ON**.
 4. Authentication > URL Configuration: Site URL = Vercel URL; Redirect URLs add `https://<app>/login.html`.
 5. Auth > Users: invite `admin@markley.demo` etc., then run seed UPDATEs to set role/status.

@@ -1,5 +1,6 @@
 // /api/classes/:id/assignments — GET list, POST create (assignment.create).
 import { authContext, hasPerm, isAdmin, logActivity, clientIp, activeMembership } from '../../_lib/auth.js';
+import { notifyUsers, sendEmail, appLink } from '../../_lib/email.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -65,6 +66,13 @@ export default async function handler(req, res) {
     }).select().single();
     if (error) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     await logActivity(admin, { actor_id: user.id, actor_role: profile.role, action: 'assignment.create', target_type: 'class', target_id: id, metadata: { assignment_id: data.id, title: data.title }, ip: clientIp(req) });
+    if (data.status === 'published') {
+      const { data: members } = await admin.from('class_members').select('user_id').eq('class_id', id).eq('role_in_class', 'student').eq('status', 'active');
+      const ids = (members || []).map((m) => m.user_id);
+      const link = appLink(`/dashboard.html?tab=assignments&open=${data.id}`);
+      await notifyUsers(admin, { user_ids: ids, type: 'assignment', title: `New assignment: ${data.title}`, body: data.due_date ? `Due ${new Date(data.due_date).toLocaleString()}` : '', link });
+      sendEmail(admin, ids, `New assignment: ${data.title}`, `New assignment: ${data.title}`, `<p>${data.description || ''}</p>`, link).catch(() => {});
+    }
     return res.status(201).json({ assignment: data });
   }
 

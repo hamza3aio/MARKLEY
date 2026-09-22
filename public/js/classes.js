@@ -44,5 +44,15 @@ export function createClassesApi(session) {
     attendance: (classId, qs = '') => call(`/api/classes/${encodeURIComponent(classId)}/attendance` + qs),
     attendanceMark: (classId, body) => call(`/api/classes/${encodeURIComponent(classId)}/attendance`, { method: 'POST', body: JSON.stringify(body) }),
     analytics: (classId, qs = '') => call(`/api/classes/${encodeURIComponent(classId)}/analytics` + qs),
+    sessions: (classId, upcoming = false) => call(`/api/classes/${encodeURIComponent(classId)}/sessions` + (upcoming ? '?upcoming=1' : '')),
+    sessionCreate: (classId, body) => call(`/api/classes/${encodeURIComponent(classId)}/sessions`, { method: 'POST', body: JSON.stringify(body) }),
+    session: (id) => call('/api/sessions/' + encodeURIComponent(id)),
+    sessionUpdate: (id, body) => call('/api/sessions/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify(body) }),
+    sessionDelete: (id) => call('/api/sessions/' + encodeURIComponent(id), { method: 'DELETE' }),
+    events: (classId) => call(`/api/classes/${encodeURIComponent(classId)}/events`),
+    eventCreate: (classId, body) => call(`/api/classes/${encodeURIComponent(classId)}/events`, { method: 'POST', body: JSON.stringify(body) }),
+    calendar: (from, to) => call(`/api/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+    notifications: (unread = false) => call('/api/notifications' + (unread ? '?unread=1' : '')),
+    notifRead: (body) => call('/api/notifications', { method: 'PATCH', body: JSON.stringify(body) }),
   };
 }

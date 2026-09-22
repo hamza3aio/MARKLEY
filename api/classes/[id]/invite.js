@@ -2,6 +2,7 @@
 // assistant member with class.invite). Enforces single-use + expiry + revocation model.
 import { randomBytes } from 'node:crypto';
 import { authContext, hasPerm, isAdmin, logActivity, clientIp, activeMembership, validEmail } from '../../_lib/auth.js';
+import { notifyUsers, sendEmail, appLink } from '../../_lib/email.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -55,5 +56,11 @@ export default async function handler(req, res) {
     target_type: 'class', target_id: id,
     metadata: { email: normEmail, role: role_in_class }, ip: clientIp(req),
   });
+  // In-app + email notification if the invitee already has an account.
+  const link = appLink(`/invite.html?token=${token}`);
+  if (existing) {
+    await notifyUsers(admin, { user_ids: [existing.id], type: 'invitation', title: `Class invitation: ${cls.name}`, body: `You were invited as ${role_in_class}.`, link });
+    sendEmail(admin, [existing.id], `Class invitation: ${cls.name}`, `You are invited to ${cls.name}`, `<p>You were invited as <b>${role_in_class}</b>.</p>`, link).catch(() => {});
+  }
   return res.status(201).json({ invitation: invite, token });
 }

@@ -15,11 +15,15 @@ Vercel-native educational platform for IGCSE students in Egypt. English only.
 ## Phase 3 (done)
 - Storage buckets, content library, assignments, submissions, PDF scanner
 
-## Phase 4 scope (this commit)
-- Manual grading (score 0–max, feedback, submission marked graded)
-- Attendance marking (per-day grid, no future dates, student/parent read views)
-- Analytics (per-student aggregates, per-assignment averages, Chart.js chart + tables)
-- Excel export (grades / attendance / full report .xlsx, generated server-side)
+## Phase 4 (done)
+- Manual grading, attendance, analytics, xlsx export
+
+## Phase 5 scope (this commit)
+- Live sessions (Zoom/Teams/Meet links, live-now badge, join redirect, member notifications)
+- Calendar (month grid + upcoming: sessions, events, assignment deadlines)
+- Class events (event/exam/deadline, staff-created)
+- Notifications bell (unread badge, mark read) + Resend EmailService abstraction
+- Daily session-reminder cron (`CRON_SECRET` guarded)
 
 Phases 3–10 follow `docs/ROADMAP.md`.
 
@@ -38,7 +42,9 @@ Phases 3–10 follow `docs/ROADMAP.md`.
 - `SUPABASE_ANON_KEY` (exposed via `/api/config` only — safe, public key with RLS)
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only, never sent to browser)
 - `APP_URL` (production URL)
-- Later: `RESEND_API_KEY`, `AI_API_KEY`, `AI_PROVIDER`
+- `RESEND_API_KEY` + `RESEND_FROM` (server-only; emails skipped if unset)
+- `CRON_SECRET` (authorizes `/api/cron/session-reminders`)
+- Later: `AI_API_KEY`, `AI_PROVIDER`
 
 ## Deploy
 See `docs/VERCEL_DEPLOY.md` (GitHub → Vercel, env, domain, Supabase wiring). Backend and frontend deploy together — `/api` is the backend.

@@ -1,6 +1,7 @@
 // /api/assignments/:id/grades — GET staff gradebook, POST upsert grade.
 // Staff only (assignment.grade): score 0..max_points, feedback. Sets submission graded.
 import { authContext, hasPerm, isAdmin, logActivity, clientIp, activeMembership } from '../../_lib/auth.js';
+import { notifyUsers, sendEmail, appLink } from '../../_lib/email.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -48,6 +49,9 @@ export default async function handler(req, res) {
     if (error) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     await admin.from('assignment_submissions').update({ status: 'graded' }).eq('assignment_id', id).eq('student_id', student_id);
     await logActivity(admin, { actor_id: user.id, actor_role: profile.role, action: 'grade.change', target_type: 'assignment', target_id: id, metadata: { student_id, score: rounded }, ip: clientIp(req) });
+    const link = appLink(`/dashboard.html?tab=assignments&open=${id}`);
+    await notifyUsers(admin, { user_ids: [student_id], type: 'grade', title: `Grade released: ${rounded}/${asg.max_points}`, body: feedback.trim().slice(0, 200), link });
+    sendEmail(admin, [student_id], 'Grade released', `Grade: ${rounded}/${asg.max_points}`, `<p>Score: <b>${rounded}/${asg.max_points}</b></p><p>${feedback.trim()}</p>`, link).catch(() => {});
     return res.status(200).json({ ok: true, score: rounded });
   }
 

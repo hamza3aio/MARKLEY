@@ -33,7 +33,7 @@ export default async function handler(req, res) {
 
     const admin = createClient(url, service, { auth: { persistSession: false } });
     const { data: profile, error: pErr } = await admin
-      .from('profiles').select('id,email,full_name,role,status,theme,created_at').eq('id', user.id).single();
+      .from('profiles').select('id,email,full_name,role,status,theme,email_notifications,created_at').eq('id', user.id).single();
     if (pErr || !profile) return res.status(403).json({ error: 'Account not provisioned. Contact admin.' });
     if (profile.status !== 'active') {
       return res.status(403).json({ error: 'Account is not active. Contact admin.', code: 'account_' + profile.status });

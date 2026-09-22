@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
-    "exceljs": "^4.4.0"
+    "exceljs": "^4.4.0",
+    "resend": "^6.28.1"
   },
   "engines": {
     "node": ">=18"
