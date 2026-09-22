@@ -4,17 +4,18 @@ Vercel-native educational platform for IGCSE students in Egypt. English only.
 
 **Stack (per owner decision):** static frontend (HTML5/CSS3/JS) on Vercel + Node serverless `/api` + Supabase (Postgres, Auth, Storage). No PHP — PHP cannot run as a persistent server on Vercel, so the backend is serverless JS with the same REST separation the spec required. AI is deferred (abstraction lands in Phase 8).
 
-## Phase 1 scope (this commit)
-- Project structure, env handling, docs
-- Supabase schema + RLS + seed (`/database`)
-- Email/password auth with verification gate, password reset, session handling
-- 5 role dashboards (server-verified role via `/api/me`, never frontend role)
-- Granular `role_permissions` enforced server-side
-- Activity log (`/api/activity`, global for admin, own for others)
-- Personalization theme persisted via `/api/profile`
-- Responsive design system, reusable UI primitives
+## Phase 1 (done)
+- Project structure, env handling, docs; Supabase schema + RLS + seed
+- Email/password auth with verification gate, password reset, sessions
+- 5 role dashboards, granular permissions, activity log, theme personalization
 
-Phases 2–10 follow `docs/ROADMAP.md`.
+## Phase 2 scope (this commit)
+- Classes CRUD (soft delete), members, invitation-only join
+- Invitations: unique single-use token, 1–30 day expiry, email match, role match, revocation
+- Parent ↔ student links (admin/teacher create, parent reads)
+- Dashboards extended: Classes, Invitations, Students tabs; shareable `/invite.html?token=` links
+
+Phases 3–10 follow `docs/ROADMAP.md`.
 
 ## Requirements
 - Node 18+, Vercel CLI (`npm i -g vercel`), Supabase project, GitHub repo connected

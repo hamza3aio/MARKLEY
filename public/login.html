@@ -31,9 +31,13 @@ import { getSupabase } from '/js/supabase-client.js';
 import { toast } from '/js/ui.js';
 import { initTheme } from '/js/app.js';
 initTheme();
+function safeNext() {
+  const n = new URLSearchParams(location.search).get('next') || '/dashboard.html';
+  return n.startsWith('/') && !n.startsWith('//') ? n : '/dashboard.html';
+}
 getSupabase().then(async (sb) => {
   const { data } = await sb.auth.getSession();
-  if (data.session) location.href = '/dashboard.html';
+  if (data.session) location.href = safeNext();
 });
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -49,7 +53,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
       body: JSON.stringify({ action: 'login' }),
     }).catch(() => {});
-    location.href = '/dashboard.html';
+    location.href = safeNext();
   } catch (err) {
     document.getElementById('err').innerHTML = `<div class="alert error">${err.message}</div>`;
     toast(err.message);

@@ -1,7 +1,7 @@
 # Roadmap (spec build order, PHP removed, AI deferred)
 
-- [x] Phase 1: structure, DB, auth, roles, basic dashboards (this commit)
-- [ ] Phase 2: classes, invitations (single-use/expiry/revoke), members, parent links
+- [x] Phase 1: structure, DB, auth, roles, basic dashboards (done)
+- [x] Phase 2: classes, invitations (single-use/expiry/revoke), members, parent links (this commit)
 - [ ] Phase 3: Supabase Storage, assignments (guided/normal), submissions, mobile PDF scanner
 - [ ] Phase 4: manual grading, analytics, attendance, xlsx export (SheetJS server-side)
 - [ ] Phase 5: calendar, sessions (external links), Resend EmailService abstraction

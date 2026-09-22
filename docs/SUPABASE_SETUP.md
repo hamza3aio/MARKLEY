@@ -5,6 +5,7 @@
    - `database/schema.sql`
    - `database/rls.sql`
    - `database/seed.sql` (permission matrix; demo-user UPDATEs commented)
+   - `database/migrations/002_phase2_classes.sql` (Phase 2: classes, members, invitations, parent links)
 3. Authentication > Providers > Email: ON, **Confirm email: ON**.
 4. Authentication > URL Configuration: Site URL = Vercel URL; Redirect URLs add `https://<app>/login.html`.
 5. Auth > Users: invite `admin@markley.demo` etc., then run seed UPDATEs to set role/status.

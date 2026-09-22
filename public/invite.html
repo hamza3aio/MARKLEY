@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Class invitation — Markley</title>
+<link rel="stylesheet" href="/css/design-system.css">
+<link rel="stylesheet" href="/css/layout.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner"><div class="brand"><span class="brand-mark">M</span> Markley</div></div></header>
+<main class="container" style="max-width:520px;padding:32px 16px">
+<div class="card" id="box"><div class="loading">Checking invitation…</div></div>
+</main>
+<div id="toasts"></div>
+<script type="module">
+import { getSession, getSupabase } from '/js/supabase-client.js';
+import { createClassesApi } from '/js/classes.js';
+import { esc, toast } from '/js/ui.js';
+
+const token = new URLSearchParams(location.search).get('token') || '';
+const box = document.getElementById('box');
+if (!token) {
+  box.innerHTML = '<h1 style="margin-top:0">Invalid invitation</h1><p style="color:var(--muted)">This link is missing its token. Ask your teacher for a new one.</p>';
+  throw new Error('no token');
+}
+const session = await getSession().catch(() => null);
+if (!session) {
+  location.href = '/login.html?next=' + encodeURIComponent('/invite.html?token=' + token);
+  throw new Error('redirect');
+}
+// Validate session server-side (email verification + active status).
+const me = await fetch('/api/me', { headers: { Authorization: 'Bearer ' + session.access_token } });
+if (!me.ok) {
+  const b = await me.json().catch(() => ({}));
+  if (/verify your email/i.test(b.error || '')) location.href = '/verify.html';
+  else location.href = '/login.html';
+  throw new Error('redirect');
+}
+const api = createClassesApi(session);
+box.innerHTML = `<h1 style="margin-top:0">Class invitation</h1>
+  <p style="color:var(--muted)">You are signed in. Click below to join — invitations are single-use and expire.</p>
+  <button class="btn" id="join">Accept and join class</button>
+  <p style="font-size:14px"><a href="/dashboard.html?tab=invitations">View all invitations</a></p>`;
+document.getElementById('join').onclick = async (e) => {
+  e.target.disabled = true;
+  try {
+    const { class_id } = await api.accept(token);
+    location.href = '/dashboard.html?tab=classes&class=' + encodeURIComponent(class_id);
+  } catch (err) {
+    box.innerHTML = `<h1 style="margin-top:0">Cannot join</h1><div class="alert error">${esc(err.message)}</div>`;
+    toast(err.message);
+  }
+};
+</script>
+</body>
+</html>
