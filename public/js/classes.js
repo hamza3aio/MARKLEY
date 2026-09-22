@@ -63,5 +63,15 @@ export function createClassesApi(session) {
     pointsReset: (classId, body = {}) => call(`/api/classes/${encodeURIComponent(classId)}/points/reset`, { method: 'POST', body: JSON.stringify(body) }),
     leaderboard: (classId) => call(`/api/classes/${encodeURIComponent(classId)}/leaderboard`),
     achievements: (classId, qs = '') => call(`/api/classes/${encodeURIComponent(classId)}/achievements` + qs),
+    examMeta: () => call('/api/exams/meta'),
+    examMetaAdd: (body) => call('/api/exams/meta', { method: 'POST', body: JSON.stringify(body) }),
+    examsList: (qs = '') => call('/api/exams' + qs),
+    examCreate: (body) => call('/api/exams', { method: 'POST', body: JSON.stringify(body) }),
+    examDetail: (id) => call('/api/exams/' + encodeURIComponent(id)),
+    examUpdate: (id, body) => call('/api/exams/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify(body) }),
+    examDelete: (id) => call('/api/exams/' + encodeURIComponent(id), { method: 'DELETE' }),
+    examResources: (id) => call(`/api/exams/${encodeURIComponent(id)}/resources`),
+    examResourceAdd: (id, body) => call(`/api/exams/${encodeURIComponent(id)}/resources`, { method: 'POST', body: JSON.stringify(body) }),
+    examResourceDelete: (id, resourceId) => call(`/api/exams/${encodeURIComponent(id)}/resources`, { method: 'DELETE', body: JSON.stringify({ resource_id: resourceId }) }),
   };
 }

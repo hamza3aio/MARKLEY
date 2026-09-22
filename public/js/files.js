@@ -42,3 +42,18 @@ export async function uploadMany(session, args, files, onOne) {
   }
   return out;
 }
+
+// Exam-library upload (admin): mints URL from /api/exams/upload-url.
+export async function uploadExamFile(session, { exam_id, kind, file }) {
+  const r = await fetch('/api/exams/upload-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+    body: JSON.stringify({ exam_id, kind, name: file.name, mime: file.type || 'application/octet-stream', size: file.size }),
+  });
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(b.error || 'Something went wrong. Please try again.');
+  const sb = await getSupabase();
+  const { error } = await sb.storage.from(b.bucket).uploadToSignedUrl(b.path, b.token, file);
+  if (error) throw new Error('Upload failed. Please try again.');
+  return { path: b.path, name: file.name };
+}

@@ -10,6 +10,7 @@
    - `database/migrations/004_phase4_grading_attendance.sql` (Phase 4: grades, attendance)
    - `database/migrations/005_phase5_sessions_notifications.sql` (Phase 5: sessions, events, notifications)
    - `database/migrations/006_phase6_gamification.sql` (Phase 6: point rules, ledger, achievements)
+   - `database/migrations/007_phase7_exams.sql` (Phase 7: boards, subjects, exams, resources)
 3. Authentication > Providers > Email: ON, **Confirm email: ON**.
 4. Authentication > URL Configuration: Site URL = Vercel URL; Redirect URLs add `https://<app>/login.html`.
 5. Auth > Users: invite `admin@markley.demo` etc., then run seed UPDATEs to set role/status.

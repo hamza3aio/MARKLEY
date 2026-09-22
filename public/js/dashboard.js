@@ -3,7 +3,7 @@ import { requireAuth, signOut } from './auth.js';
 import { applyTheme } from './app.js';
 import { esc, stateRow, toast } from './ui.js';
 import { createClassesApi } from './classes.js';
-import { uploadOne, uploadMany, formatBytes } from './files.js';
+import { uploadOne, uploadMany, uploadExamFile, formatBytes } from './files.js';
 
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
@@ -35,6 +35,7 @@ const tabs = [
   { id: 'classes', label: 'Classes' },
   { id: 'assignments', label: 'Assignments' },
   { id: 'calendar', label: 'Calendar' },
+  { id: 'exams', label: 'Exams' },
   { id: 'invitations', label: 'Invitations' },
 ];
 if (['parent', 'teacher', 'admin'].includes(profile.role)) tabs.push({ id: 'students', label: 'Students' });
@@ -47,12 +48,13 @@ let current = params.get('tab') || 'overview';
 if (!tabs.some((t) => t.id === current)) current = 'overview';
 let openClassId = params.get('class') || null;
 let openAssignmentId = params.get('open') || null;
+let openExamId = params.get('exam') || null;
 
 function renderNav() {
   nav.innerHTML = tabs.map((t) => `<a href="#" data-t="${t.id}" class="${t.id === current ? 'active' : ''}">${esc(t.label)}</a>`).join('');
   nav.querySelectorAll('a').forEach((a) => (a.onclick = (e) => {
     e.preventDefault();
-    current = a.dataset.t; openClassId = null; openAssignmentId = null; renderNav(); render();
+    current = a.dataset.t; openClassId = null; openAssignmentId = null; openExamId = null; renderNav(); render();
   }));
 }
 renderNav();
@@ -116,6 +118,7 @@ async function render() {
   if (current === 'classes') return renderClasses();
   if (current === 'assignments') return renderAssignmentsHome();
   if (current === 'calendar') return renderCalendar();
+  if (current === 'exams') return renderExamsHome();
   if (current === 'invitations') return renderInvitations();
   if (current === 'students') return renderStudents();
   if (current === 'activity') return renderActivity();
@@ -349,6 +352,235 @@ function showEditClass(c) {
       render();
     } catch (err) { toast(err.message); }
   };
+}
+
+// ---- Exams library (Phase 7) -----------------------------------------------------------------
+let examMetaCache = null;
+async function getExamMeta() {
+  if (!examMetaCache) examMetaCache = await api.examMeta();
+  return examMetaCache;
+}
+const examFilters = { search: '', subject: '', board: '', year: '', session: '', paper: '', page: 0 };
+
+async function renderExamsHome() {
+  if (openExamId) return renderExamDetail(openExamId);
+  main.innerHTML = stateRow('loading', 'Loading exams…');
+  try {
+    const { subjects, boards } = await getExamMeta();
+    const qs = new URLSearchParams({ limit: '25', offset: String(examFilters.page * 25) });
+    ['search', 'subject', 'board', 'year', 'session', 'paper'].forEach((k) => { if (examFilters[k]) qs.set(k, examFilters[k]); });
+    const { exams, total, canManage } = await api.examsList('?' + qs.toString());
+    const pages = Math.max(1, Math.ceil(total / 25));
+    const years = [];
+    for (let y = new Date().getFullYear() + 1; y >= 2015; y--) years.push(y);
+    main.innerHTML = `
+      <section class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div><h2 style="margin:0">Exams & mark schemes</h2>
+        <p style="color:var(--muted);margin:0">${total} paper${total === 1 ? '' : 's'}</p></div>
+        <div style="flex:1"></div>
+        ${canManage ? '<button class="btn" id="newExam">Add exam</button>' : ''}
+      </section>
+      <section class="card"><form id="xf" class="form">
+        <div class="grid cols-3">
+          <label class="field">Search<input class="input" id="xsearch" value="${esc(examFilters.search)}" placeholder="Title or paper"></label>
+          <label class="field">Subject<select class="input" id="xsubj"><option value="">All subjects</option>${subjects.map((s) => `<option value="${esc(s.code)}" ${examFilters.subject === s.code ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+          <label class="field">Board<select class="input" id="xboard"><option value="">All boards</option>${boards.map((b) => `<option value="${esc(b.code)}" ${examFilters.board === b.code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>
+          <label class="field">Year<select class="input" id="xyear"><option value="">All years</option>${years.map((y) => `<option ${String(y) === examFilters.year ? 'selected' : ''}>${y}</option>`).join('')}</select></label>
+          <label class="field">Session<select class="input" id="xses"><option value="">All sessions</option>${['Feb/March', 'May/June', 'Oct/Nov'].map((s) => `<option ${examFilters.session === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+          <label class="field">Paper<input class="input" id="xpaper" value="${esc(examFilters.paper)}" placeholder="e.g. Paper 2"></label>
+        </div>
+        <div style="display:flex;gap:8px"><button class="btn secondary" type="submit">Filter</button>
+        <button class="btn ghost" type="button" id="xclear">Clear</button></div>
+      </form></section>
+      <section class="card">
+        ${exams.length ? `<div class="table-wrap"><table><thead><tr><th>Paper</th><th>Subject</th><th>Board</th><th>Year</th><th>Session</th><th></th></tr></thead><tbody>
+        ${exams.map((e) => `<tr><td>${esc(e.title || e.paper)}<br><small style="color:var(--muted)">${esc(e.paper)}</small></td>
+        <td>${esc((subjects.find((s) => s.code === e.subject_code) || {}).name || e.subject_code)}</td>
+        <td>${esc((boards.find((b) => b.code === e.board_code) || {}).name || e.board_code)}</td>
+        <td>${e.year}</td><td>${esc(e.session)}</td>
+        <td>${e.question_name || e.markscheme_name ? '<span class="badge success">files</span>' : '<span class="badge">meta only</span>'} <button class="btn secondary" data-exam="${esc(e.id)}">Open</button></td></tr>`).join('')}
+        </tbody></table></div>` : stateRow('empty', 'No papers match these filters.')}
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button class="btn secondary" id="xprev" ${examFilters.page === 0 ? 'disabled' : ''}>← Prev</button>
+          <span style="color:var(--muted)">Page ${examFilters.page + 1} of ${pages}</span>
+          <button class="btn secondary" id="xnext" ${examFilters.page + 1 >= pages ? 'disabled' : ''}>Next →</button>
+        </div></section>`;
+    document.getElementById('xf').onsubmit = (e) => {
+      e.preventDefault();
+      examFilters.search = document.getElementById('xsearch').value;
+      examFilters.subject = document.getElementById('xsubj').value;
+      examFilters.board = document.getElementById('xboard').value;
+      examFilters.year = document.getElementById('xyear').value;
+      examFilters.session = document.getElementById('xses').value;
+      examFilters.paper = document.getElementById('xpaper').value;
+      examFilters.page = 0;
+      render();
+    };
+    document.getElementById('xclear').onclick = () => { Object.keys(examFilters).forEach((k) => { examFilters[k] = k === 'page' ? 0 : ''; }); render(); };
+    document.getElementById('xprev').onclick = () => { examFilters.page--; render(); };
+    document.getElementById('xnext').onclick = () => { examFilters.page++; render(); };
+    main.querySelectorAll('[data-exam]').forEach((b) => (b.onclick = () => { openExamId = b.dataset.exam; render(); }));
+    document.getElementById('newExam')?.addEventListener('click', showNewExam);
+  } catch (e) { main.innerHTML = stateRow('error', e.message); }
+}
+
+function showNewExam() {
+  getExamMeta().then(({ subjects, boards }) => {
+    const years = [];
+    for (let y = new Date().getFullYear() + 1; y >= 2015; y--) years.push(y);
+    main.innerHTML = `
+      <section class="card"><h2 style="margin-top:0">Add exam paper</h2>
+        <form id="ef3" class="form">
+          <div class="grid cols-2">
+            <label class="field">Subject<select class="input" id="esub">${subjects.map((s) => `<option value="${esc(s.code)}">${esc(s.name)}</option>`).join('')}</select></label>
+            <label class="field">Board<select class="input" id="ebrd">${boards.map((b) => `<option value="${esc(b.code)}">${esc(b.name)}</option>`).join('')}</select></label>
+            <label class="field">Year<select class="input" id="eyr">${years.map((y) => `<option>${y}</option>`).join('')}</select></label>
+            <label class="field">Session<select class="input" id="eses"><option>May/June</option><option>Oct/Nov</option><option>Feb/March</option></select></label>
+          </div>
+          <label class="field">Paper<input class="input" id="epap" required maxlength="60" placeholder="Paper 2"></label>
+          <label class="field">Title (optional)<input class="input" id="etit" maxlength="200" placeholder="e.g. Physics 0625/22"></label>
+          <div style="display:flex;gap:8px"><button class="btn" type="submit">Create</button>
+          <button class="btn secondary" type="button" id="cancel">Cancel</button></div>
+        </form>
+        <p style="color:var(--muted);font-size:13px">Upload the question paper and mark scheme from the exam page after creating it. Missing board/subject? Add them below.</p>
+        <form id="metaF" class="form"><div class="grid cols-3">
+          <label class="field">Kind<select class="input" id="mkind"><option value="board">Board</option><option value="subject">Subject</option></select></label>
+          <label class="field">Code<input class="input" id="mcode" required pattern="[a-z0-9_]{2,30}" placeholder="ocr_gateway"></label>
+          <label class="field">Name<input class="input" id="mname" required maxlength="80"></label>
+        </div><button class="btn secondary" type="submit">Add</button></form></section>`;
+    document.getElementById('cancel').onclick = () => render();
+    document.getElementById('ef3').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const { exam } = await api.examCreate({
+          subject_code: document.getElementById('esub').value,
+          board_code: document.getElementById('ebrd').value,
+          year: Number(document.getElementById('eyr').value),
+          session: document.getElementById('eses').value,
+          paper: document.getElementById('epap').value,
+          title: document.getElementById('etit').value,
+        });
+        toast('Exam created. Upload its files.');
+        openExamId = exam.id;
+        render();
+      } catch (err) { toast(err.message); }
+    };
+    document.getElementById('metaF').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await api.examMetaAdd({ kind: document.getElementById('mkind').value, code: document.getElementById('mcode').value, name: document.getElementById('mname').value });
+        examMetaCache = null;
+        toast('Added.');
+        showNewExam();
+      } catch (err) { toast(err.message); }
+    };
+  }).catch((e) => { main.innerHTML = stateRow('error', e.message); });
+}
+
+async function renderExamDetail(id) {
+  main.innerHTML = stateRow('loading', 'Loading exam…');
+  try {
+    const { exam: ex, questionUrl, markschemeUrl, resources, canManage } = await api.examDetail(id);
+    const { subjects, boards } = await getExamMeta();
+    const sName = (subjects.find((s) => s.code === ex.subject_code) || {}).name || ex.subject_code;
+    const bName = (boards.find((b) => b.code === ex.board_code) || {}).name || ex.board_code;
+    main.innerHTML = `
+      <section class="card">
+        <button class="btn ghost" id="backX">← Exams</button>
+        <h2 style="margin:8px 0 4px">${esc(ex.title || `${sName} ${ex.paper}`)}</h2>
+        <p style="color:var(--muted);margin:0">${esc(sName)} · ${esc(bName)} · ${ex.year} · ${esc(ex.session)} · ${esc(ex.paper)}</p>
+        ${canManage ? `<div style="display:flex;gap:8px;margin-top:8px"><button class="btn secondary" id="editX">Edit</button><button class="btn danger" id="delX">Delete</button></div>` : ''}
+      </section>
+      <section class="card"><h3 style="margin-top:0">Question paper</h3>
+        ${questionUrl ? `<a class="btn" href="${esc(questionUrl)}" target="_blank" rel="noopener">Open ${esc(ex.question_name || 'question paper')}</a>` : stateRow('empty', 'Not uploaded yet.')}
+        ${canManage ? `<form id="qpf" class="form" style="margin-top:8px"><label class="field">Upload question paper (PDF)<input class="input" id="qpfile" type="file" accept="application/pdf" required></label><button class="btn secondary" type="submit">Upload</button></form>` : ''}
+      </section>
+      <section class="card"><h3 style="margin-top:0">Mark scheme</h3>
+        ${markschemeUrl ? `<a class="btn" href="${esc(markschemeUrl)}" target="_blank" rel="noopener">Open ${esc(ex.markscheme_name || 'mark scheme')}</a>` : stateRow('empty', 'Not uploaded yet.')}
+        ${canManage ? `<form id="msf" class="form" style="margin-top:8px"><label class="field">Upload mark scheme (PDF)<input class="input" id="msfile" type="file" accept="application/pdf" required></label><button class="btn secondary" type="submit">Upload</button></form>` : ''}
+      </section>
+      <section class="card"><h3 style="margin-top:0">Additional resources (${resources.length})</h3>
+        ${resources.length ? `<div class="table-wrap"><table><tbody>
+        ${resources.map((r) => `<tr><td>${esc(r.label)}<br><small style="color:var(--muted)">${esc(r.name)}</small></td>
+        <td>${r.downloadUrl ? `<a class="btn secondary" href="${esc(r.downloadUrl)}" target="_blank" rel="noopener">Open</a>` : ''}</td>
+        ${canManage ? `<td><button class="btn ghost" data-rdel="${esc(r.id)}">Delete</button></td>` : ''}</tr>`).join('')}
+        </tbody></table></div>` : stateRow('empty', 'No extra resources.')}
+        ${canManage ? `<form id="resf" class="form" style="margin-top:8px"><div class="grid cols-2">
+        <label class="field">Label<input class="input" id="reslabel" required maxlength="120" placeholder="e.g. Grade thresholds"></label>
+        <label class="field">File<input class="input" id="resfile" type="file" required></label>
+        </div><button class="btn secondary" type="submit">Add resource</button></form>` : ''}
+      </section>`;
+    document.getElementById('backX').onclick = () => { openExamId = null; render(); };
+    document.getElementById('delX')?.addEventListener('click', async () => {
+      if (!confirm('Delete this exam and all its files?')) return;
+      try { await api.examDelete(ex.id); toast('Exam deleted.'); openExamId = null; render(); }
+      catch (e) { toast(e.message); }
+    });
+    document.getElementById('editX')?.addEventListener('click', () => showEditExam(ex, sName, bName));
+    const up = async (inputId, kind, after) => {
+      const file = document.getElementById(inputId).files[0];
+      if (!file) return;
+      try {
+        const ref = await uploadExamFile(session, { exam_id: ex.id, kind, file });
+        await api.examUpdate(ex.id, { [kind]: { path: ref.path, name: file.name } });
+        toast('Uploaded.');
+        render();
+      } catch (err) { toast(err.message); }
+    };
+    document.getElementById('qpf')?.addEventListener('submit', (e) => { e.preventDefault(); up('qpfile', 'question'); });
+    document.getElementById('msf')?.addEventListener('submit', (e) => { e.preventDefault(); up('msfile', 'markscheme'); });
+    document.getElementById('resf')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const file = document.getElementById('resfile').files[0];
+      if (!file) return;
+      try {
+        const ref = await uploadExamFile(session, { exam_id: ex.id, kind: 'resource', file });
+        await api.examResourceAdd(ex.id, { path: ref.path, label: document.getElementById('reslabel').value, name: file.name, mime: file.type || 'application/octet-stream', size: file.size });
+        toast('Resource added.');
+        render();
+      } catch (err) { toast(err.message); }
+    });
+    main.querySelectorAll('[data-rdel]').forEach((b) => (b.onclick = async () => {
+      if (!confirm('Delete this resource?')) return;
+      try { await api.examResourceDelete(ex.id, b.dataset.rdel); toast('Deleted.'); render(); }
+      catch (e) { toast(e.message); }
+    }));
+  } catch (e) { main.innerHTML = stateRow('error', e.message); }
+}
+
+function showEditExam(ex) {
+  getExamMeta().then(({ subjects, boards }) => {
+    main.innerHTML = `
+      <section class="card"><h2 style="margin-top:0">Edit exam</h2>
+        <form id="ef4" class="form">
+          <div class="grid cols-2">
+            <label class="field">Subject<select class="input" id="xsub">${subjects.map((s) => `<option value="${esc(s.code)}" ${s.code === ex.subject_code ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+            <label class="field">Board<select class="input" id="xbrd">${boards.map((b) => `<option value="${esc(b.code)}" ${b.code === ex.board_code ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>
+            <label class="field">Year<input class="input" id="xyr" type="number" min="1990" max="2100" value="${ex.year}"></label>
+            <label class="field">Session<select class="input" id="xss">${['Feb/March', 'May/June', 'Oct/Nov'].map((s) => `<option ${s === ex.session ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+          </div>
+          <label class="field">Paper<input class="input" id="xpa" required maxlength="60" value="${esc(ex.paper)}"></label>
+          <label class="field">Title<input class="input" id="xti" maxlength="200" value="${esc(ex.title || '')}"></label>
+          <div style="display:flex;gap:8px"><button class="btn" type="submit">Save</button>
+          <button class="btn secondary" type="button" id="cancel">Cancel</button></div>
+        </form></section>`;
+    document.getElementById('cancel').onclick = () => render();
+    document.getElementById('ef4').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await api.examUpdate(ex.id, {
+          subject_code: document.getElementById('xsub').value,
+          board_code: document.getElementById('xbrd').value,
+          year: Number(document.getElementById('xyr').value),
+          session: document.getElementById('xss').value,
+          paper: document.getElementById('xpa').value,
+          title: document.getElementById('xti').value,
+        });
+        toast('Exam updated.');
+        render();
+      } catch (err) { toast(err.message); }
+    };
+  }).catch((e) => { main.innerHTML = stateRow('error', e.message); });
 }
 
 // ---- Invitations -------------------------------------------------------------

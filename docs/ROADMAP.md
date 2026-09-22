@@ -5,7 +5,8 @@
 - [x] Phase 3: Storage, assignments, submissions, PDF scanner (done)
 - [x] Phase 4: grading, attendance, analytics, xlsx export (done)
 - [x] Phase 5: calendar, sessions, notifications, Resend (done)
-- [x] Phase 6: points, leaderboards, achievements (this commit)
+- [x] Phase 6: points, leaderboards, achievements (done)
+- [x] Phase 7: exams + mark schemes (this commit)
 - [ ] Phase 3: Supabase Storage, assignments (guided/normal), submissions, mobile PDF scanner
 - [ ] Phase 4: manual grading, analytics, attendance, xlsx export (SheetJS server-side)
 - [ ] Phase 5: calendar, sessions (external links), Resend EmailService abstraction
