@@ -1,0 +1,12 @@
+# Supabase setup
+
+1. Create project at supabase.com. Note URL, `anon` key, `service_role` key.
+2. SQL editor — run in order:
+   - `database/schema.sql`
+   - `database/rls.sql`
+   - `database/seed.sql` (permission matrix; demo-user UPDATEs commented)
+3. Authentication > Providers > Email: ON, **Confirm email: ON**.
+4. Authentication > URL Configuration: Site URL = Vercel URL; Redirect URLs add `https://<app>/login.html`.
+5. Auth > Users: invite `admin@markley.demo` etc., then run seed UPDATEs to set role/status.
+6. Storage (Phase 3): buckets `class-files` (private), `avatars` (private). Policies land with Phase 3 migration.
+7. Never put `service_role` in frontend code. Only Vercel env + `/api`.

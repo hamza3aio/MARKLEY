@@ -1,0 +1,19 @@
+/* MARKLEY app layout: topbar + sidebar, responsive (mobile-first for students). */
+.topbar{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border)}
+.topbar-inner{display:flex;align-items:center;gap:12px;padding:10px 16px;max-width:1280px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}
+.brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;display:grid;place-items:center;font-weight:900}
+.topbar .spacer{flex:1}
+.shell{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:240px 1fr;gap:16px;padding:16px}
+.sidebar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;height:fit-content;position:sticky;top:64px}
+.sidebar nav{display:grid;gap:4px}
+.sidebar a{padding:9px 12px;border-radius:9px;color:var(--text);font-weight:600;font-size:14px}
+.sidebar a.active,.sidebar a:hover{background:#eef2ff;color:var(--primary)}
+.main{display:grid;gap:16px;align-content:start}
+.menu-btn{display:none}
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .sidebar{position:fixed;inset:56px auto 0 0;width:260px;transform:translateX(-110%);transition:.2s;z-index:40;border-radius:0}
+  .sidebar.open{transform:none}
+  .menu-btn{display:inline-flex}
+}

@@ -1,0 +1,17 @@
+{
+  "name": "markley",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Markley Educational Platform — Vercel-native frontend + serverless API + Supabase",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "check:js": "node --check api/config.js && node --check api/me.js && node --check api/activity.js && node --check api/profile.js && node --check public/js/app.js && node --check public/js/supabase-client.js && node --check public/js/auth.js && node --check public/js/ui.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deployment docs — Markley</title>
+<link rel="stylesheet" href="/css/design-system.css">
+<link rel="stylesheet" href="/css/layout.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner"><div class="brand"><span class="brand-mark">M</span> Markley</div><div class="spacer"></div><a class="btn secondary" href="/">Home</a></div></header>
+<main class="container" style="padding:24px 16px;display:grid;gap:16px">
+<section class="card"><h1 style="margin-top:0">Deploy in 10 minutes</h1>
+<ol>
+<li>Run <code>database/schema.sql</code>, <code>rls.sql</code>, <code>seed.sql</code> in Supabase.</li>
+<li>Enable Email auth + Confirm email. Set Site URL to your Vercel URL.</li>
+<li>Import <code>hamza3aio/MARKLEY</code> in Vercel. Output dir: <code>public</code>.</li>
+<li>Set env: <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code>, <code>APP_URL</code>.</li>
+<li>Deploy. Verify <code>/api/config</code> never leaks the service key.</li>
+</ol>
+<p style="color:var(--muted)">Full steps: <code>docs/VERCEL_DEPLOY.md</code> and <code>docs/SUPABASE_SETUP.md</code> in the repo.</p></section>
+</main>
+</body>
+</html>

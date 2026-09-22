@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markley Educational Platform — IGCSE learning for Egypt</title>
+<link rel="stylesheet" href="/css/design-system.css">
+<link rel="stylesheet" href="/css/layout.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+<div class="brand"><span class="brand-mark">M</span> Markley Educational Platform</div>
+<div class="spacer"></div>
+<a class="btn secondary" href="/login.html">Sign in</a>
+</div></header>
+<main class="container" style="padding:32px 16px;display:grid;gap:16px">
+<section class="card">
+<h1 style="margin:0 0 8px">Classroom-simple, built for IGCSE in Egypt.</h1>
+<p style="color:var(--muted);margin:0 0 16px">Role-based dashboards for admins, teachers, assistants, students and parents. Invitation-only student access, secure grading, exams and mark schemes.</p>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<a class="btn" href="/login.html">Sign in</a>
+<a class="btn secondary" href="/docs.html">Deployment docs</a>
+</div>
+</section>
+<section class="grid cols-3">
+<div class="card stat"><div class="num">5</div><div class="lbl">Roles with server-enforced permissions</div></div>
+<div class="card stat"><div class="num">RLS</div><div class="lbl">Supabase Row Level Security on every table</div></div>
+<div class="card stat"><div class="num">Vercel</div><div class="lbl">Static frontend + serverless API, no exposed secrets</div></div>
+</section>
+<section class="card">
+<h2 style="margin-top:0">Phase 1 status</h2>
+<p style="color:var(--muted)">Authentication with email verification, role dashboards, activity log and personalization are live. Classes, invitations, assignments, exams and AI arrive in later phases per the build order in README.</p>
+</section>
+</main>
+<div id="toasts"></div>
+<script type="module">import { initTheme } from '/js/app.js'; initTheme();</script>
+</body>
+</html>
