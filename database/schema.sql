@@ -69,7 +69,7 @@ create index if not exists profiles_email_idx on public.profiles(email);
 
 -- Auto-update updated_at
 create or replace function public.touch_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public as $$
 begin new.updated_at = now(); return new; end $$;
 drop trigger if exists profiles_touch on public.profiles;
 create trigger profiles_touch before update on public.profiles
@@ -87,6 +87,9 @@ end $$;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users
 for each row execute function public.handle_new_user();
+
+-- Trigger function must never be callable directly via RPC
+revoke execute on function public.handle_new_user() from anon, authenticated;
 
 -- 4. Activity logs ----------------------------------------------------------
 create table if not exists public.activity_logs (

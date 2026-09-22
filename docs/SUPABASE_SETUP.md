@@ -13,6 +13,7 @@
    - `database/migrations/007_phase7_exams.sql` (Phase 7: boards, subjects, exams, resources)
    - `database/migrations/008_phase8_ai_quizzes.sql` (Phase 8: quizzes, attempts, AI usage, suggestions)
    - `database/migrations/009_phase9_plans.sql` (Phase 9: plans, features, assignments, requests)
+   - `database/migrations/010_phase10_hardening.sql` (Phase 10: function lockdown, initplan policies, FK indexes)
 3. Authentication > Providers > Email: ON, **Confirm email: ON**.
 4. Authentication > URL Configuration: Site URL = Vercel URL; Redirect URLs add `https://<app>/login.html`.
 5. Auth > Users: invite `admin@markley.demo` etc., then run seed UPDATEs to set role/status.

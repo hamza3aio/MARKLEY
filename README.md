@@ -45,7 +45,7 @@ All 10 phases complete. See `docs/ROADMAP.md` for the full history.
 
 ## Local development
 1. `cp .env.example .env.local` — fill at minimum `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-2. In Supabase SQL editor run in order: `database/schema.sql`, `database/rls.sql`, `database/seed.sql`, then `database/migrations/002` through `009` in numeric order
+2. In Supabase SQL editor run in order: `database/schema.sql`, `database/rls.sql`, `database/seed.sql`, then `database/migrations/002` through `010` in numeric order
 3. Supabase Auth: enable Email provider + **Confirm email** ON
 4. `npm install` then `npm test` (static gate), then `vercel dev` (serves `/public` + `/api` with env from `.env.local`)
 5. Create demo users via Supabase Auth, then activate per `database/seed.sql` comments

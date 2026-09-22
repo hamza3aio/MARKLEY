@@ -4,34 +4,89 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Markley Educational Platform — IGCSE learning for Egypt</title>
+<meta name="description" content="Markley is a complete learning platform for IGCSE students in Egypt: classes, assignments, grading, exams with mark schemes, quizzes, gamification and AI-assisted study.">
 <link rel="stylesheet" href="/css/design-system.css">
 <link rel="stylesheet" href="/css/layout.css">
+<style>
+.hero{padding:64px 0 32px;text-align:center}
+.hero h1{font-size:clamp(32px,5vw,54px);margin:0 0 12px;letter-spacing:-.02em}
+.hero p.sub{color:var(--muted);font-size:18px;max-width:640px;margin:0 auto 24px}
+.cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:24px}
+.section{padding:24px 0}
+.section h2{text-align:center;margin:0 0 6px}
+.section p.lead{text-align:center;color:var(--muted);max-width:640px;margin:0 auto 20px}
+.feat h3{margin:0 0 6px;font-size:17px}
+.feat p{margin:0;color:var(--muted);font-size:14px}
+.feat .icon{font-size:26px}
+.steps{counter-reset:step}
+.step{display:flex;gap:14px;align-items:flex-start}
+.step .n{flex:0 0 36px;height:36px;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:800}
+footer{border-top:1px solid var(--border);margin-top:32px;padding:24px 0;color:var(--muted);font-size:14px;text-align:center}
+</style>
 </head>
 <body>
 <header class="topbar"><div class="topbar-inner">
-<div class="brand"><span class="brand-mark">M</span> Markley Educational Platform</div>
+<div class="brand"><span class="brand-mark">M</span> Markley</div>
 <div class="spacer"></div>
-<a class="btn secondary" href="/login.html">Sign in</a>
+<a class="btn ghost" href="/login.html">Sign in</a>
+<a class="btn" href="/signup.html">Get started</a>
 </div></header>
-<main class="container" style="padding:32px 16px;display:grid;gap:16px">
-<section class="card">
-<h1 style="margin:0 0 8px">Classroom-simple, built for IGCSE in Egypt.</h1>
-<p style="color:var(--muted);margin:0 0 16px">Role-based dashboards for admins, teachers, assistants, students and parents. Invitation-only student access, secure grading, exams and mark schemes.</p>
-<div style="display:flex;gap:8px;flex-wrap:wrap">
-<a class="btn" href="/login.html">Sign in</a>
-<a class="btn secondary" href="/docs.html">Deployment docs</a>
+
+<main class="container">
+<section class="hero">
+<h1>IGCSE learning, organized like a classroom — powered like a platform.</h1>
+<p class="sub">Markley gives Egyptian IGCSE students, teachers, assistants and parents one place for classes, assignments, grading, past papers with mark schemes, quizzes, live sessions and progress analytics.</p>
+<div class="cta-row">
+<a class="btn" href="/signup.html">Create free account</a>
+<a class="btn secondary" href="/login.html">Sign in</a>
+</div>
+<div class="chips">
+<span class="badge">5 role dashboards</span>
+<span class="badge">Invitation-only classes</span>
+<span class="badge">Past papers + mark schemes</span>
+<span class="badge">Mobile PDF scanner</span>
+<span class="badge">AI study tools</span>
 </div>
 </section>
-<section class="grid cols-3">
-<div class="card stat"><div class="num">5</div><div class="lbl">Roles with server-enforced permissions</div></div>
-<div class="card stat"><div class="num">RLS</div><div class="lbl">Supabase Row Level Security on every table</div></div>
-<div class="card stat"><div class="num">Vercel</div><div class="lbl">Static frontend + serverless API, no exposed secrets</div></div>
+
+<section class="section">
+<h2>Everything a class needs</h2>
+<p class="lead">Not a static website — a working platform with secure logins, permissions, file storage and activity tracking.</p>
+<div class="grid cols-4">
+<div class="card feat"><div class="icon">🏫</div><h3>Classes & invitations</h3><p>Teachers create classes and invite students by email. Single-use links with expiry. No random joins.</p></div>
+<div class="card feat"><div class="icon">📝</div><h3>Assignments</h3><p>Guided written work and file uploads, due dates, late rules, attachments — plus a mobile camera-to-PDF scanner.</p></div>
+<div class="card feat"><div class="icon">📊</div><h3>Grading & analytics</h3><p>Manual grades with feedback, attendance tracking, per-student analytics and one-click Excel reports.</p></div>
+<div class="card feat"><div class="icon">📚</div><h3>Exams library</h3><p>Searchable past papers with mark schemes by subject, board, year, session and paper.</p></div>
+<div class="card feat"><div class="icon">🏆</div><h3>Gamification</h3><p>Teacher-defined point systems, opt-in leaderboards with privacy controls, and unlockable achievements.</p></div>
+<div class="card feat"><div class="icon">🤖</div><h3>AI study tools</h3><p>Quiz and assignment generators plus grading suggestions — always teacher-approved, never automatic.</p></div>
+<div class="card feat"><div class="icon">📅</div><h3>Calendar & sessions</h3><p>Deadlines, events and live Zoom/Teams/Meet sessions in one calendar with reminders.</p></div>
+<div class="card feat"><div class="icon">🔔</div><h3>Notifications</h3><p>In-app inbox plus email for grades, assignments, invitations and sessions.</p></div>
+</div>
 </section>
-<section class="card">
-<h2 style="margin-top:0">Phase 1 status</h2>
-<p style="color:var(--muted)">Authentication with email verification, role dashboards, activity log and personalization are live. Classes, invitations, assignments, exams and AI arrive in later phases per the build order in README.</p>
+
+<section class="section">
+<h2>Built for every role</h2>
+<p class="lead">Each role gets its own dashboard, enforced server-side — never just hidden buttons.</p>
+<div class="grid cols-3">
+<div class="card feat"><div class="icon">👩‍🏫</div><h3>Teachers</h3><p>Run classes end to end: content, assignments, grading, attendance, analytics, points and AI drafts.</p></div>
+<div class="card feat"><div class="icon">🎓</div><h3>Students</h3><p>Join by invitation, submit from any phone, scan pages to PDF, take quizzes, track points and achievements.</p></div>
+<div class="card feat"><div class="icon">👨‍👩‍👧</div><h3>Parents</h3><p>Follow linked students: grades, attendance, assignments and upcoming sessions. Free, forever.</p></div>
+</div>
+</section>
+
+<section class="section">
+<h2>Get started in minutes</h2>
+<div class="grid cols-3 steps">
+<div class="card step"><span class="n">1</span><div><b>Create your account</b><p style="color:var(--muted);margin:4px 0 0;font-size:14px">Sign up free and verify your email. Students join classes through teacher invitations.</p></div></div>
+<div class="card step"><span class="n">2</span><div><b>Join or build a class</b><p style="color:var(--muted);margin:4px 0 0;font-size:14px">Teachers create a class and share invite links. Students accept and appear on the roster.</p></div></div>
+<div class="card step"><span class="n">3</span><div><b>Teach and learn</b><p style="color:var(--muted);margin:4px 0 0;font-size:14px">Post assignments, submit work, grade, revise past papers and watch progress grow.</p></div></div>
+</div>
+<div class="cta-row" style="margin-top:20px"><a class="btn" href="/signup.html">Start free</a></div>
 </section>
 </main>
+
+<footer>Markley Educational Platform · Built for IGCSE students in Egypt · <a href="/login.html">Sign in</a></footer>
 <div id="toasts"></div>
 <script type="module">import { initTheme } from '/js/app.js'; initTheme();</script>
 </body>

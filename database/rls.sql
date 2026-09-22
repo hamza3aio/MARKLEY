@@ -17,10 +17,10 @@ create policy "permissions readable" on public.permissions for select to authent
 drop policy if exists "role_permissions readable" on public.role_permissions;
 create policy "role_permissions readable" on public.role_permissions for select to authenticated using (true);
 
--- Profiles: user reads own row only.
+-- Profiles: user reads own row only (initplan-safe: auth.uid() evaluated once).
 drop policy if exists "profiles select own" on public.profiles;
 create policy "profiles select own" on public.profiles
-for select to authenticated using (auth.uid() = id);
+for select to authenticated using ((select auth.uid()) = id);
 
 -- No direct update/insert/delete from browser. All writes go through /api
 -- (service-role + permission checks) so role/status can never be self-escalated.
@@ -29,4 +29,4 @@ drop policy if exists "profiles update own safe fields" on public.profiles;
 -- Activity logs: user reads own entries only. Writes via /api (service-role).
 drop policy if exists "activity select own" on public.activity_logs;
 create policy "activity select own" on public.activity_logs
-for select to authenticated using (auth.uid() = actor_id);
+for select to authenticated using ((select auth.uid()) = actor_id);
