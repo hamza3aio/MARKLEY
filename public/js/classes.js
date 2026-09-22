@@ -38,5 +38,11 @@ export function createClassesApi(session) {
     submissions: (id) => call(`/api/assignments/${encodeURIComponent(id)}/submissions`),
     submit: (id, body) => call(`/api/assignments/${encodeURIComponent(id)}/submissions`, { method: 'POST', body: JSON.stringify(body) }),
     mySubmission: (id) => call(`/api/assignments/${encodeURIComponent(id)}/my-submission`),
+    grades: (id) => call(`/api/assignments/${encodeURIComponent(id)}/grades`),
+    saveGrade: (id, body) => call(`/api/assignments/${encodeURIComponent(id)}/grades`, { method: 'POST', body: JSON.stringify(body) }),
+    myGrade: (id) => call(`/api/assignments/${encodeURIComponent(id)}/my-grade`),
+    attendance: (classId, qs = '') => call(`/api/classes/${encodeURIComponent(classId)}/attendance` + qs),
+    attendanceMark: (classId, body) => call(`/api/classes/${encodeURIComponent(classId)}/attendance`, { method: 'POST', body: JSON.stringify(body) }),
+    analytics: (classId, qs = '') => call(`/api/classes/${encodeURIComponent(classId)}/analytics` + qs),
   };
 }

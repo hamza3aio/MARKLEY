@@ -12,13 +12,14 @@ Vercel-native educational platform for IGCSE students in Egypt. English only.
 ## Phase 2 (done)
 - Classes CRUD, members, invitation-only join, parent links
 
-## Phase 3 scope (this commit)
-- Supabase Storage buckets (`class-files`, `assignment-files`, `submission-files`, private)
-- Signed-URL uploads/downloads (browser never touches Storage directly)
-- Class content library (upload/rename/delete, visibility)
-- Assignments (guided/normal, draft/published, due dates, late rules, attachments)
-- Submissions (students only, resubmit replaces, late detection)
-- Mobile PDF scanner (`/scan.html`: camera/gallery/live capture, crop, reorder, PDF preview, attach)
+## Phase 3 (done)
+- Storage buckets, content library, assignments, submissions, PDF scanner
+
+## Phase 4 scope (this commit)
+- Manual grading (score 0–max, feedback, submission marked graded)
+- Attendance marking (per-day grid, no future dates, student/parent read views)
+- Analytics (per-student aggregates, per-assignment averages, Chart.js chart + tables)
+- Excel export (grades / attendance / full report .xlsx, generated server-side)
 
 Phases 3–10 follow `docs/ROADMAP.md`.
 

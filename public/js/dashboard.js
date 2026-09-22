@@ -189,7 +189,17 @@ async function renderClassDetail(id) {
       <section class="card"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <h3 style="margin:0">Assignments</h3><div style="flex:1"></div>
         ${isStaff && can('assignment.create') ? '<button class="btn" id="newAsg">New assignment</button>' : ''}</div>
-        <div id="asgBox" style="margin-top:8px"></div></section>`;
+        <div id="asgBox" style="margin-top:8px"></div></section>
+      <section class="card"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <h3 style="margin:0">Attendance</h3><div style="flex:1"></div>
+        ${isStaff ? `<input class="input" id="attdate" type="date" style="width:auto" value="${esc(new Date().toISOString().slice(0, 10))}">` : ''}</div>
+        <div id="attBox" style="margin-top:8px"></div></section>
+      <section class="card"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <h3 style="margin:0">Analytics</h3><div style="flex:1"></div>
+        ${isStaff && can('reports.export') ? `<button class="btn secondary" id="expG">Grades .xlsx</button>
+        <button class="btn secondary" id="expA">Attendance .xlsx</button>
+        <button class="btn secondary" id="expR">Full report</button>` : ''}</div>
+        <div id="anaBox" style="margin-top:8px"></div></section>`;
     document.getElementById('back').onclick = () => { openClassId = null; render(); };
     document.getElementById('editBtn')?.addEventListener('click', () => showEditClass(c));
     document.getElementById('delBtn')?.addEventListener('click', async () => {
@@ -230,6 +240,24 @@ async function renderClassDetail(id) {
     document.getElementById('newAsg')?.addEventListener('click', () => showNewAssignment(c.id));
     loadContentSection(c.id, my_role);
     loadClassAssignments(c.id, isStaff);
+    loadAttendanceSection(c.id, my_role, members);
+    loadAnalyticsSection(c.id);
+    const dl = (type) => async () => {
+      try {
+        const r = await fetch(`/api/classes/${encodeURIComponent(c.id)}/export?type=${type}`, {
+          headers: { Authorization: 'Bearer ' + session.access_token },
+        });
+        if (!r.ok) throw new Error('Export failed. Please try again.');
+        const blob = await r.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `markley-${type}.xlsx`;
+        a.click();
+      } catch (e) { toast(e.message); }
+    };
+    document.getElementById('expG')?.addEventListener('click', dl('grades'));
+    document.getElementById('expA')?.addEventListener('click', dl('attendance'));
+    document.getElementById('expR')?.addEventListener('click', dl('report'));
   } catch (e) { main.innerHTML = stateRow('error', e.message); }
 }
 
@@ -505,15 +533,29 @@ async function renderAssignmentDetail(id) {
 async function renderSubmissionsTable(a) {
   const box = document.getElementById('roleSection');
   try {
-    const { submissions } = await api.submissions(a.id);
+    const [{ submissions }, { grades }] = await Promise.all([api.submissions(a.id), api.grades(a.id)]);
+    const gMap = Object.fromEntries((grades || []).map((g) => [g.student_id, g]));
     box.innerHTML = `<section class="card"><h3 style="margin-top:0">Submissions (${submissions.length})</h3>
-      ${submissions.length ? `<div class="table-wrap"><table><thead><tr><th>Student</th><th>Status</th><th>Answer</th><th>Files</th><th>Submitted</th></tr></thead><tbody>
-      ${submissions.map((s) => `<tr><td>${esc(s.student?.full_name || s.student?.email || '—')}</td>
-      <td><span class="badge ${s.status === 'late' ? 'warn' : 'success'}">${esc(s.status)}</span></td>
+      ${submissions.length ? `<div class="table-wrap"><table><thead><tr><th>Student</th><th>Status</th><th>Answer</th><th>Files</th><th>Grade / ${esc(String(a.max_points))}</th><th></th></tr></thead><tbody>
+      ${submissions.map((s) => { const g = gMap[s.student_id]; return `<tr><td>${esc(s.student?.full_name || s.student?.email || '—')}</td>
+      <td><span class="badge ${s.status === 'late' ? 'warn' : s.status === 'graded' ? 'success' : ''}">${esc(s.status)}</span></td>
       <td>${esc((s.text_content || '').slice(0, 160))}${(s.text_content || '').length > 160 ? '…' : ''}</td>
       <td>${(s.files || []).map((f) => f.downloadUrl ? `<a href="${esc(f.downloadUrl)}" target="_blank" rel="noopener">${esc(f.name)}</a>` : esc(f.name)).join('<br>') || '—'}</td>
-      <td>${esc(new Date(s.submitted_at).toLocaleString())}</td></tr>`).join('')}</tbody></table></div>
-      <p style="color:var(--muted);font-size:13px">Grading lands in Phase 4.</p>` : stateRow('empty', 'No submissions yet.')}</section>`;
+      <td><input class="input" style="width:80px" type="number" min="0" max="${esc(String(a.max_points))}" step="0.5" data-score="${esc(s.student_id)}" value="${g ? esc(String(g.score)) : ''}" aria-label="Score">
+      <input class="input" style="margin-top:4px;min-width:140px" data-fb="${esc(s.student_id)}" maxlength="2000" placeholder="Feedback" value="${g ? esc(g.feedback || '') : ''}" aria-label="Feedback"></td>
+      <td><button class="btn secondary" data-grade="${esc(s.student_id)}">Save</button></td></tr>`; }).join('')}</tbody></table></div>
+      <p style="color:var(--muted);font-size:13px">Grades are manual in this phase. AI-assisted grading arrives in Phase 8 with teacher approval.</p>` : stateRow('empty', 'No submissions yet.')}</section>`;
+    box.querySelectorAll('[data-grade]').forEach((b) => (b.onclick = async () => {
+      const sid = b.dataset.grade;
+      const score = box.querySelector(`[data-score="${CSS.escape(sid)}"]`).value;
+      const feedback = box.querySelector(`[data-fb="${CSS.escape(sid)}"]`).value;
+      b.disabled = true;
+      try {
+        await api.saveGrade(a.id, { student_id: sid, score: Number(score), feedback });
+        toast('Grade saved.');
+        render();
+      } catch (e) { toast(e.message); b.disabled = false; }
+    }));
   } catch (e) { box.innerHTML = stateRow('error', e.message); }
 }
 
@@ -529,7 +571,10 @@ async function renderSubmitForm(a, existing) {
   let staged = null;
   try { staged = JSON.parse(sessionStorage.getItem('markley.staged') || 'null'); } catch { /* ignore */ }
   if (staged && staged.assignment_id !== a.id) staged = null;
+  let myGrade = null;
+  try { myGrade = (await api.myGrade(a.id)).grade; } catch { /* ungraded */ }
   box.innerHTML = `<section class="card"><h3 style="margin-top:0">My submission ${mine ? `<span class="badge success">${esc(mine.status)}</span>` : ''}</h3>
+    ${myGrade ? `<div class="alert ok"><b>Grade: ${esc(String(myGrade.score))} / ${esc(String(myGrade.max_points))}</b>${myGrade.feedback ? `<br>${esc(myGrade.feedback)}` : ''}</div>` : ''}
     ${mine ? `<p style="color:var(--muted);font-size:13px">Submitted ${esc(new Date(mine.submitted_at).toLocaleString())}. Submitting again replaces it.</p>` : ''}
     ${myFiles.length ? `<p>Current files:<br>${myFiles.map((f) => esc(f.name)).join('<br>')}</p>` : ''}
     ${staged ? `<div class="alert ok">Scanned PDF ready: ${esc(staged.name)} (${esc(formatBytes(staged.size))}) — it will be attached on submit.</div>` : ''}
@@ -595,6 +640,101 @@ function showEditAssignment(a) {
       render();
     } catch (err) { toast(err.message); }
   };
+}
+
+// ---- Attendance + analytics (Phase 4) ------------------------------------------------
+async function loadAttendanceSection(classId, myRole, members) {
+  const box = document.getElementById('attBox');
+  if (!box) return;
+  const staffView = ['admin', 'teacher', 'assistant'].includes(myRole || '');
+  const students = (members || []).filter((m) => m.role_in_class === 'student');
+  if (!staffView) {
+    box.innerHTML = stateRow('loading', 'Loading attendance…');
+    try {
+      const { records } = await api.attendance(classId);
+      if (!records.length) { box.innerHTML = stateRow('empty', 'No attendance records yet.'); return; }
+      const pres = records.filter((r) => r.status === 'present' || r.status === 'late').length;
+      box.innerHTML = `<p><b>Attendance: ${Math.round((pres / records.length) * 1000) / 10}%</b> (${pres}/${records.length} sessions)</p>
+        <div class="table-wrap"><table><thead><tr><th>Date</th><th>Status</th></tr></thead><tbody>
+        ${records.slice(0, 60).map((r) => `<tr><td>${esc(r.date)}</td><td><span class="badge">${esc(r.status)}</span></td></tr>`).join('')}
+        </tbody></table></div>`;
+    } catch (e) { box.innerHTML = stateRow('error', e.message); }
+    return;
+  }
+  async function paint(date) {
+    box.innerHTML = stateRow('loading', 'Loading attendance…');
+    try {
+      const { records } = await api.attendance(classId, `?from=${date}&to=${date}`);
+      const bySid = Object.fromEntries(records.map((r) => [r.student_id, r.status]));
+      box.innerHTML = !students.length ? stateRow('empty', 'No students enrolled.') : `
+        <div class="table-wrap"><table><thead><tr><th>Student</th><th>Status on ${esc(date)}</th></tr></thead><tbody>
+        ${students.map((m) => `<tr><td>${esc(m.profile?.full_name || m.profile?.email || '—')}</td>
+        <td><select class="input" data-att="${esc(m.user_id)}">
+        ${['present', 'absent', 'late', 'excused'].map((s) => `<option value="${s}" ${bySid[m.user_id] === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select></td></tr>`).join('')}</tbody></table></div>
+        <button class="btn" id="attSave" style="margin-top:8px">Save attendance</button>`;
+      document.getElementById('attSave').onclick = async (e) => {
+        e.target.disabled = true;
+        try {
+          const recs = [...box.querySelectorAll('[data-att]')].map((s) => ({ student_id: s.dataset.att, status: s.value }));
+          await api.attendanceMark(classId, { date, records: recs });
+          toast('Attendance saved.');
+        } catch (err) { toast(err.message); }
+        finally { e.target.disabled = false; }
+      };
+    } catch (e) { box.innerHTML = stateRow('error', e.message); }
+  }
+  const input = document.getElementById('attdate');
+  input.onchange = () => paint(input.value);
+  paint(input.value);
+}
+
+let chartLoaded = false;
+async function ensureChart() {
+  if (window.Chart) return true;
+  if (chartLoaded) return !!window.Chart;
+  chartLoaded = true;
+  await new Promise((res) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+    s.onload = res; s.onerror = res;
+    document.head.appendChild(s);
+  });
+  return !!window.Chart;
+}
+
+async function loadAnalyticsSection(classId) {
+  const box = document.getElementById('anaBox');
+  if (!box) return;
+  box.innerHTML = stateRow('loading', 'Loading analytics…');
+  try {
+    const { rows, assignments, summary } = await api.analytics(classId);
+    if (!summary) { box.innerHTML = stateRow('empty', 'No data yet.'); return; }
+    box.innerHTML = `
+      <section class="grid cols-4">
+        <div class="card stat"><div class="num">${summary.avg_score ?? '—'}</div><div class="lbl">Avg score %</div></div>
+        <div class="card stat"><div class="num">${summary.submission_rate ?? '—'}%</div><div class="lbl">Submission rate</div></div>
+        <div class="card stat"><div class="num">${summary.attendance_rate ?? '—'}%</div><div class="lbl">Attendance rate</div></div>
+        <div class="card stat"><div class="num">${summary.students}</div><div class="lbl">Students</div></div>
+      </section>
+      <div class="card" style="margin-top:12px"><h4 style="margin-top:0">Average score per assignment</h4>
+      <canvas id="anaChart" height="120"></canvas></div>
+      <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Student</th><th>Avg %</th><th>Graded</th><th>Submitted</th><th>Late</th><th>Attendance</th></tr></thead><tbody>
+      ${rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${r.avg_pct ?? '—'}</td><td>${r.graded_count}</td><td>${r.submitted_count}</td><td>${r.late_count}</td><td>${r.attendance_pct ?? '—'}${r.attendance_pct !== null ? '%' : ''}</td></tr>`).join('')}
+      </tbody></table></div>`;
+    if (await ensureChart()) {
+      try {
+        new window.Chart(document.getElementById('anaChart'), {
+          type: 'bar',
+          data: {
+            labels: assignments.map((x) => x.title.slice(0, 24)),
+            datasets: [{ data: assignments.map((x) => x.avg_pct ?? 0) }],
+          },
+          options: { plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100 } } },
+        });
+      } catch { /* table remains the source of truth */ }
+    }
+  } catch (e) { box.innerHTML = stateRow('error', e.message); }
 }
 
 // ---- Activity / settings (Phase 1, unchanged) ----------------------------------
