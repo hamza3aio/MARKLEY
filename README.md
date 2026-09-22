@@ -9,11 +9,16 @@ Vercel-native educational platform for IGCSE students in Egypt. English only.
 - Email/password auth with verification gate, password reset, sessions
 - 5 role dashboards, granular permissions, activity log, theme personalization
 
-## Phase 2 scope (this commit)
-- Classes CRUD (soft delete), members, invitation-only join
-- Invitations: unique single-use token, 1–30 day expiry, email match, role match, revocation
-- Parent ↔ student links (admin/teacher create, parent reads)
-- Dashboards extended: Classes, Invitations, Students tabs; shareable `/invite.html?token=` links
+## Phase 2 (done)
+- Classes CRUD, members, invitation-only join, parent links
+
+## Phase 3 scope (this commit)
+- Supabase Storage buckets (`class-files`, `assignment-files`, `submission-files`, private)
+- Signed-URL uploads/downloads (browser never touches Storage directly)
+- Class content library (upload/rename/delete, visibility)
+- Assignments (guided/normal, draft/published, due dates, late rules, attachments)
+- Submissions (students only, resubmit replaces, late detection)
+- Mobile PDF scanner (`/scan.html`: camera/gallery/live capture, crop, reorder, PDF preview, attach)
 
 Phases 3–10 follow `docs/ROADMAP.md`.
 

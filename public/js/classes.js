@@ -1,4 +1,5 @@
 // MARKLEY Phase 2 client: classes, invitations, parent links.
+// Phase 3: files, assignments, submissions.
 export function createClassesApi(session) {
   async function call(path, opts = {}) {
     const r = await fetch(path, {
@@ -22,5 +23,20 @@ export function createClassesApi(session) {
     revoke: (inviteId) => call(`/api/invitations/${encodeURIComponent(inviteId)}/revoke`, { method: 'POST' }),
     parentLinks: (qs = '') => call('/api/parent-links' + qs),
     parentLinkCreate: (body) => call('/api/parent-links', { method: 'POST', body: JSON.stringify(body) }),
+    filesList: (classId) => call('/api/files?class_id=' + encodeURIComponent(classId)),
+    fileConfirm: (body) => call('/api/files', { method: 'POST', body: JSON.stringify(body) }),
+    fileRename: (id, body) => call('/api/files/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify(body) }),
+    fileDelete: (id) => call('/api/files/' + encodeURIComponent(id), { method: 'DELETE' }),
+    assignments: (classId) => call(`/api/classes/${encodeURIComponent(classId)}/assignments`),
+    assignmentCreate: (classId, body) => call(`/api/classes/${encodeURIComponent(classId)}/assignments`, { method: 'POST', body: JSON.stringify(body) }),
+    assignment: (id) => call('/api/assignments/' + encodeURIComponent(id)),
+    assignmentUpdate: (id, body) => call('/api/assignments/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify(body) }),
+    assignmentDelete: (id) => call('/api/assignments/' + encodeURIComponent(id), { method: 'DELETE' }),
+    attachments: (id) => call(`/api/assignments/${encodeURIComponent(id)}/attachments`),
+    attachmentConfirm: (id, body) => call(`/api/assignments/${encodeURIComponent(id)}/attachments`, { method: 'POST', body: JSON.stringify(body) }),
+    attachmentDelete: (id, attachmentId) => call(`/api/assignments/${encodeURIComponent(id)}/attachments`, { method: 'DELETE', body: JSON.stringify({ attachment_id: attachmentId }) }),
+    submissions: (id) => call(`/api/assignments/${encodeURIComponent(id)}/submissions`),
+    submit: (id, body) => call(`/api/assignments/${encodeURIComponent(id)}/submissions`, { method: 'POST', body: JSON.stringify(body) }),
+    mySubmission: (id) => call(`/api/assignments/${encodeURIComponent(id)}/my-submission`),
   };
 }

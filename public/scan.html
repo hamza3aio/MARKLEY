@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scan to PDF — Markley</title>
+<link rel="stylesheet" href="/css/design-system.css">
+<link rel="stylesheet" href="/css/layout.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css">
+<style>
+#pages{display:grid;gap:12px}
+.page{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px}
+.page img{width:96px;height:128px;object-fit:cover;border-radius:8px;border:1px solid var(--border)}
+.page .ops{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+#video{width:100%;border-radius:12px;background:#000}
+.crop-wrap{max-height:60vh;overflow:hidden}
+.crop-wrap img{max-width:100%;display:block}
+</style>
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+<a class="btn ghost" id="back" href="/dashboard.html?tab=assignments">← Back</a>
+<div class="brand"><span class="brand-mark">M</span> Scan to PDF</div>
+</div></header>
+<main class="container" style="padding:16px;display:grid;gap:16px;max-width:720px">
+<section class="card">
+<h2 style="margin-top:0">1. Add pages</h2>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<button class="btn" id="camBtn">Take photo</button>
+<button class="btn secondary" id="libBtn">Choose images</button>
+<button class="btn secondary" id="liveBtn">Live camera</button>
+</div>
+<input class="input" id="camInput" type="file" accept="image/*" capture="environment" hidden>
+<input class="input" id="libInput" type="file" accept="image/*" multiple hidden>
+<div id="liveBox" style="display:none;margin-top:12px">
+<video id="video" playsinline muted></video>
+<div style="display:flex;gap:8px;margin-top:8px"><button class="btn" id="snap">Capture</button>
+<button class="btn secondary" id="liveOff">Close camera</button></div>
+</div>
+<p style="color:var(--muted);font-size:13px">Images are optimized on-device (max 1600px, JPEG). Nothing uploads until you submit.</p>
+</section>
+<section class="card"><h2 style="margin-top:0">2. Pages (<span id="count">0</span>)</h2><div id="pages"></div></section>
+<section class="card"><h2 style="margin-top:0">3. Generate PDF</h2>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<button class="btn" id="gen" disabled>Generate PDF</button>
+<button class="btn secondary" id="dl" disabled>Download</button>
+<button class="btn secondary" id="attach" disabled>Attach to submission</button>
+</div>
+<div id="prevBox" style="margin-top:12px"></div>
+</section>
+</main>
+<div id="toasts"></div>
+<div class="modal-back" id="cropBack"><div class="modal">
+<h3 style="margin-top:0">Crop page</h3>
+<div class="crop-wrap"><img id="cropImg" alt="Crop preview"></div>
+<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="cropApply">Apply</button>
+<button class="btn secondary" id="cropCancel">Cancel</button></div>
+</div></div>
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script type="module" src="/js/scan.js"></script>
+</body>
+</html>
