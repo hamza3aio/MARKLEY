@@ -1,5 +1,5 @@
 // PATCH /api/plan-requests/:id — update status (plans.manage).
-import { authContext, hasPerm, isAdmin } from '../../_lib/auth.js';
+import { authContext, hasPerm, isAdmin } from '../_lib/auth.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);

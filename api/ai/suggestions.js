@@ -1,6 +1,6 @@
 // /api/ai/suggestions — GET pending suggestions (staff, ?assignment_id=).
 // /api/ai/suggestions/:id/resolve — POST { decision: approve|modify|reject, score?, feedback? }.
-import { authContext, hasPerm, isAdmin, logActivity, clientIp, activeMembership } from '../../_lib/auth.js';
+import { authContext, hasPerm, isAdmin, logActivity, clientIp, activeMembership } from '../_lib/auth.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);

@@ -1,6 +1,6 @@
 // /api/exams — GET list (any active user) with search + filters + pagination.
 // POST create (exams.manage). Question paper attached after creation via upload-url.
-import { authContext, hasPerm, isAdmin, logActivity, clientIp } from './_lib/auth.js';
+import { authContext, hasPerm, isAdmin, logActivity, clientIp } from '../_lib/auth.js';
 
 const SESSIONS = ['Feb/March', 'May/June', 'Oct/Nov'];
 

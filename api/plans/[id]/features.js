@@ -1,7 +1,7 @@
 // PUT /api/plans/:id/features — replace feature set wholesale (plans.manage).
 // Body: { features: { "classes.max": 10, "ai_tools": 1, ... } }
-import { authContext, hasPerm, isAdmin, logActivity, clientIp } from '../../../_lib/auth.js';
-import { FEATURES } from '../../../_lib/plans.js';
+import { authContext, hasPerm, isAdmin, logActivity, clientIp } from '../../_lib/auth.js';
+import { FEATURES } from '../../_lib/plans.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);

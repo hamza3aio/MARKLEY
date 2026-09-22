@@ -1,6 +1,6 @@
 // /api/quizzes — GET mine (personal + class), POST save draft (manual or AI-reviewed).
 // Student-saved quizzes are personal-only unless a teacher publishes them to a class.
-import { authContext, hasPerm, isAdmin, activeMembership } from './_lib/auth.js';
+import { authContext, hasPerm, isAdmin, activeMembership } from '../_lib/auth.js';
 
 const KINDS = ['mcq', 'short', 'essay'];
 
