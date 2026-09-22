@@ -7,7 +7,7 @@ Browser (public/, HTML/CSS/JS)
   │  fetch /api/config → { SUPABASE_URL, ANON_KEY } (public only)
   │  Supabase Auth directly (email verification, sessions)
   ▼
-Vercel Serverless (/api/*.js, Node)
+Vercel Serverless (`api/[...route].js` single catch-all → `server/` handlers, Node)
   │  validates Supabase JWT on every call
   │  uses SERVICE_ROLE (server env only) for DB access
   │  re-checks role_permissions — never trusts client role

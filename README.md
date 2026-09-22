@@ -2,7 +2,7 @@
 
 Vercel-native educational platform for IGCSE students in Egypt. English only.
 
-**Stack (per owner decision):** static frontend (HTML5/CSS3/JS) on Vercel + Node serverless `/api` + Supabase (Postgres, Auth, Storage). No PHP — PHP cannot run as a persistent server on Vercel, so the backend is serverless JS with the same REST separation the spec required.
+**Stack (per owner decision):** static frontend (HTML5/CSS3/JS) on Vercel + Node serverless `/api` + Supabase (Postgres, Auth, Storage). No PHP — PHP cannot run as a persistent server on Vercel, so the backend is serverless JS with the same REST separation the spec required. The API ships as **one catch-all function** (`api/[...route].js` → `server/`) to stay within the Vercel Hobby 12-function cap.
 
 ## Phase 1 (done)
 - Project structure, env handling, docs; Supabase schema + RLS + seed

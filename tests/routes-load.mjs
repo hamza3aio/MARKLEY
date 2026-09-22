@@ -15,12 +15,19 @@ const files = [];
     if (statSync(p).isDirectory()) { walk(p); continue; }
     if (e.endsWith('.js')) files.push(p);
   }
+})(join(root, 'server'));
+(function walkApi(dir) {
+  for (const e of readdirSync(dir)) {
+    const p = join(dir, e);
+    if (statSync(p).isDirectory()) continue;
+    if (e.endsWith('.js')) files.push(p);
+  }
 })(join(root, 'api'));
 
 let fail = 0;
 for (const f of files) {
   const rel = relative(root, f).replace(/\\/g, '/');
-  if (rel.startsWith('api/_lib/')) {
+  if (rel.startsWith('server/_lib/')) {
     try { await import('file:///' + f.replace(/\\/g, '/')); console.log(`ok   lib  ${rel}`); }
     catch (e) { fail++; console.log(`FAIL lib  ${rel}: ${e.message}`); }
     continue;
