@@ -2,6 +2,7 @@
 // POST (student: submit text + pre-uploaded files; guided requires text, normal requires file).
 import { authContext, isAdmin, logActivity, clientIp, activeMembership } from '../../_lib/auth.js';
 import { PURPOSE, validateFile, signedDownload } from '../../_lib/files.js';
+import { awardRule, grantAchievement } from '../../_lib/points.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -90,6 +91,7 @@ export default async function handler(req, res) {
       if (error) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     }
     await logActivity(admin, { actor_id: user.id, actor_role: profile.role, action: 'assignment.submit', target_type: 'assignment', target_id: id, metadata: { files: files.length, late }, ip: clientIp(req) });
+    awardRule(admin, { class_id: asg.class_id, user_id: user.id, code: 'assignment_submit', dedupe_key: `submit:${id}`, awarded_by: null }).catch(() => {});
     return res.status(201).json({ ok: true, submission_id: subId, status });
   }
 

@@ -1,6 +1,7 @@
 // /api/classes/:id/attendance — GET records, POST mark a day.
 // POST staff only. GET: staff all, students own, parents linked students.
 import { authContext, isAdmin, logActivity, clientIp, activeMembership } from '../../_lib/auth.js';
+import { awardRule } from '../../_lib/points.js';
 
 const STATUSES = ['present', 'absent', 'late', 'excused'];
 
@@ -69,6 +70,9 @@ export default async function handler(req, res) {
     const { error } = await admin.from('attendance').upsert(rows, { onConflict: 'class_id,date,student_id' });
     if (error) return res.status(500).json({ error: 'Something went wrong. Please try again.' });
     await logActivity(admin, { actor_id: user.id, actor_role: profile.role, action: 'attendance.mark', target_type: 'class', target_id: id, metadata: { date: day, count: rows.length }, ip: clientIp(req) });
+    rows.filter((r) => r.status === 'present' || r.status === 'late').forEach((r) => {
+      awardRule(admin, { class_id: id, user_id: r.student_id, code: 'attendance', dedupe_key: `attend:${day}`, awarded_by: user.id }).catch(() => {});
+    });
     return res.status(200).json({ ok: true, count: rows.length });
   }
 

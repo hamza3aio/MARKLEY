@@ -48,7 +48,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'PATCH') {
     if (!canEdit) return res.status(403).json({ error: 'You do not have permission to edit this class.' });
-    const { name, subject, description, leaderboard_enabled } = req.body || {};
+    const { name, subject, description, leaderboard_enabled, leaderboard_show_names } = req.body || {};
     const patch = {};
     if (name !== undefined) {
       if (typeof name !== 'string' || name.trim().length < 3 || name.trim().length > 120) {
@@ -74,6 +74,13 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: 'You do not have permission to manage the leaderboard.' });
       }
       patch.leaderboard_enabled = leaderboard_enabled;
+    }
+    if (leaderboard_show_names !== undefined) {
+      if (typeof leaderboard_show_names !== 'boolean') return res.status(400).json({ error: 'Invalid request.' });
+      if (!hasPerm(permissions, 'leaderboard.manage') && !isAdmin(profile)) {
+        return res.status(403).json({ error: 'You do not have permission to manage the leaderboard.' });
+      }
+      patch.leaderboard_show_names = leaderboard_show_names;
     }
     if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update.' });
     const { data, error } = await admin.from('classes').update(patch).eq('id', id).select().single();

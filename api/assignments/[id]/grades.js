@@ -2,6 +2,7 @@
 // Staff only (assignment.grade): score 0..max_points, feedback. Sets submission graded.
 import { authContext, hasPerm, isAdmin, logActivity, clientIp, activeMembership } from '../../_lib/auth.js';
 import { notifyUsers, sendEmail, appLink } from '../../_lib/email.js';
+import { awardRule, grantAchievement } from '../../_lib/points.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -52,6 +53,10 @@ export default async function handler(req, res) {
     const link = appLink(`/dashboard.html?tab=assignments&open=${id}`);
     await notifyUsers(admin, { user_ids: [student_id], type: 'grade', title: `Grade released: ${rounded}/${asg.max_points}`, body: feedback.trim().slice(0, 200), link });
     sendEmail(admin, [student_id], 'Grade released', `Grade: ${rounded}/${asg.max_points}`, `<p>Score: <b>${rounded}/${asg.max_points}</b></p><p>${feedback.trim()}</p>`, link).catch(() => {});
+    if (rounded >= asg.max_points) {
+      await awardRule(admin, { class_id: asg.class_id, user_id: student_id, code: 'perfect_score', dedupe_key: `perfect:${id}`, awarded_by: user.id });
+      await grantAchievement(admin, asg.class_id, student_id, 'perfect_score', { assignment_id: id });
+    }
     return res.status(200).json({ ok: true, score: rounded });
   }
 

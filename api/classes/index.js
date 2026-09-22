@@ -1,5 +1,6 @@
 // /api/classes — GET: classes I can access. POST: create (class.create required).
 import { authContext, hasPerm, isAdmin, logActivity, clientIp, validEmail } from '../_lib/auth.js';
+import { seedDefaultRules } from '../_lib/points.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -80,6 +81,7 @@ export default async function handler(req, res) {
     await admin.from('class_members').insert({
       class_id: cls.id, user_id: teacherId, role_in_class: 'teacher', invited_by: user.id,
     });
+    await seedDefaultRules(admin, cls.id, user.id);
     await logActivity(admin, {
       actor_id: user.id, actor_role: profile.role, action: 'class.create',
       target_type: 'class', target_id: cls.id, metadata: { name: cls.name }, ip: clientIp(req),

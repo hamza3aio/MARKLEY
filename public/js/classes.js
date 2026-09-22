@@ -54,5 +54,14 @@ export function createClassesApi(session) {
     calendar: (from, to) => call(`/api/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
     notifications: (unread = false) => call('/api/notifications' + (unread ? '?unread=1' : '')),
     notifRead: (body) => call('/api/notifications', { method: 'PATCH', body: JSON.stringify(body) }),
+    pointRules: (classId) => call(`/api/classes/${encodeURIComponent(classId)}/points/rules`),
+    ruleCreate: (classId, body) => call(`/api/classes/${encodeURIComponent(classId)}/points/rules`, { method: 'POST', body: JSON.stringify(body) }),
+    ruleUpdate: (classId, ruleId, body) => call(`/api/classes/${encodeURIComponent(classId)}/points/rules/${encodeURIComponent(ruleId)}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    ruleDelete: (classId, ruleId) => call(`/api/classes/${encodeURIComponent(classId)}/points/rules/${encodeURIComponent(ruleId)}`, { method: 'DELETE' }),
+    rulesDefaults: (classId) => call(`/api/classes/${encodeURIComponent(classId)}/points/defaults`, { method: 'POST' }),
+    awardPoints: (classId, body) => call(`/api/classes/${encodeURIComponent(classId)}/points/award`, { method: 'POST', body: JSON.stringify(body) }),
+    pointsReset: (classId, body = {}) => call(`/api/classes/${encodeURIComponent(classId)}/points/reset`, { method: 'POST', body: JSON.stringify(body) }),
+    leaderboard: (classId) => call(`/api/classes/${encodeURIComponent(classId)}/leaderboard`),
+    achievements: (classId, qs = '') => call(`/api/classes/${encodeURIComponent(classId)}/achievements` + qs),
   };
 }

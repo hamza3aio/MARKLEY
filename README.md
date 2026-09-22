@@ -18,12 +18,15 @@ Vercel-native educational platform for IGCSE students in Egypt. English only.
 ## Phase 4 (done)
 - Manual grading, attendance, analytics, xlsx export
 
-## Phase 5 scope (this commit)
-- Live sessions (Zoom/Teams/Meet links, live-now badge, join redirect, member notifications)
-- Calendar (month grid + upcoming: sessions, events, assignment deadlines)
-- Class events (event/exam/deadline, staff-created)
-- Notifications bell (unread badge, mark read) + Resend EmailService abstraction
-- Daily session-reminder cron (`CRON_SECRET` guarded)
+## Phase 5 (done)
+- Live sessions, calendar, events, notifications bell, Resend EmailService
+
+## Phase 6 scope (this commit)
+- Per-class teacher-defined point rules (custom codes, no global system)
+- Auto-awards (submission, perfect score, attendance) with dedupe keys
+- Manual awards, class/student resets, defaults seeding + restore
+- Opt-in leaderboards with anonymous-name privacy mode
+- 6 achievements (first, perfect, streak, 100/500 pts, attendance) with in-app unlock alerts
 
 Phases 3–10 follow `docs/ROADMAP.md`.
 

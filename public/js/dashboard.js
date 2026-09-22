@@ -253,7 +253,11 @@ async function renderClassDetail(id) {
       <section class="card"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         <h3 style="margin:0">Events</h3><div style="flex:1"></div>
         ${isStaff ? '<button class="btn secondary" id="newEv">New event</button>' : ''}</div>
-        <div id="evBox" style="margin-top:8px"></div></section>`;
+        <div id="evBox" style="margin-top:8px"></div></section>
+      <section class="card"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <h3 style="margin:0">Points & achievements</h3><div style="flex:1"></div>
+        <span id="myPts"></span></div>
+        <div id="gameBox" style="margin-top:8px"></div></section>`;
     document.getElementById('back').onclick = () => { openClassId = null; render(); };
     document.getElementById('editBtn')?.addEventListener('click', () => showEditClass(c));
     document.getElementById('delBtn')?.addEventListener('click', async () => {
@@ -316,6 +320,7 @@ async function renderClassDetail(id) {
     document.getElementById('newEv')?.addEventListener('click', () => showNewEvent(c.id));
     loadSessionsSection(c.id, isStaff);
     loadEventsSection(c.id);
+    loadGamification(c, my_role, members);
   } catch (e) { main.innerHTML = stateRow('error', e.message); }
 }
 
@@ -698,6 +703,133 @@ function showEditAssignment(a) {
       render();
     } catch (err) { toast(err.message); }
   };
+}
+
+// ---- Gamification (Phase 6) ---------------------------------------------------------------
+async function loadGamification(c, myRole, members) {
+  const box = document.getElementById('gameBox');
+  if (!box) return;
+  const staff = ['admin', 'teacher', 'assistant'].includes(myRole || '');
+  const manager = myRole === 'admin' || c.teacher_id === profile.id;
+  box.innerHTML = stateRow('loading', 'Loading points…');
+  try {
+    const { rules } = await api.pointRules(c.id).then((r) => r, () => ({ rules: [] }));
+    const lb = await api.leaderboard(c.id).catch(() => ({ enabled: false, entries: [] }));
+    const ach = await api.achievements(c.id).catch(() => ({ catalogue: [], users: [] }));
+    const mine = (lb.entries || []).find((e) => e.mine);
+    document.getElementById('myPts').innerHTML = mine ? `<span class="badge">My points: ${mine.total} (#${mine.rank})</span>` : '';
+    const isStaffAch = myRole === 'admin' || myRole === 'teacher' || myRole === 'assistant';
+    const earnedCount = {};
+    (ach.users || []).forEach((u) => (u.earned || []).forEach((e) => { earnedCount[e.achievement_code] = (earnedCount[e.achievement_code] || 0) + 1; }));
+    const myCodes = new Set();
+    if (!isStaffAch) (ach.users || []).forEach((u) => (u.earned || []).forEach((e) => myCodes.add(e.achievement_code)));
+    const medal = (r) => (r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : `#${r}`);
+
+    let html = `
+      <h4>${isStaffAch ? 'Achievements (earned counts)' : 'My achievements'}</h4>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${(ach.catalogue || []).map((a) => {
+          const on = isStaffAch ? (earnedCount[a.code] || 0) > 0 : myCodes.has(a.code);
+          const extra = isStaffAch ? ` ×${earnedCount[a.code] || 0}` : '';
+          return `<span class="badge ${on ? 'success' : ''}" title="${esc(a.description)}">${esc(a.icon)} ${esc(a.name)}${extra}</span>`;
+        }).join('')}
+      </div>
+      <h4>Leaderboard ${lb.enabled ? '' : '(disabled)'}</h4>`;
+    if (!lb.enabled && !staff) {
+      html += stateRow('empty', 'The leaderboard is disabled for this class.');
+    } else {
+      html += !lb.entries.length ? stateRow('empty', 'No points yet.') : `
+        <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Student</th><th>Points</th></tr></thead><tbody>
+        ${lb.entries.slice(0, 20).map((e) => `<tr${e.mine ? ' style="background:#eef2ff"' : ''}><td>${medal(e.rank)}</td><td>${esc(e.name)}</td><td><b>${e.total}</b></td></tr>`).join('')}
+        </tbody></table></div>`;
+    }
+
+    if (manager) {
+      const students = (members || []).filter((m) => m.role_in_class === 'student');
+      html += `
+        <h4>Leaderboard settings</h4>
+        <label style="font-size:14px;display:flex;gap:8px;align-items:center"><input type="checkbox" id="lbOn" ${c.leaderboard_enabled ? 'checked' : ''}> Leaderboard enabled</label>
+        <label style="font-size:14px;display:flex;gap:8px;align-items:center"><input type="checkbox" id="lbNames" ${c.leaderboard_show_names !== false ? 'checked' : ''}> Show student names (off = anonymous)</label>
+        <h4>Point rules (your system — no global defaults imposed)</h4>
+        <div class="table-wrap"><table><thead><tr><th>Code</th><th>Name</th><th>Points</th><th>Active</th><th></th></tr></thead><tbody>
+        ${(rules || []).map((r) => `<tr><td><code>${esc(r.code)}</code></td><td>${esc(r.name)}</td>
+        <td><input class="input" style="width:80px" type="number" data-rpts="${esc(r.id)}" value="${r.points}"></td>
+        <td><input type="checkbox" data-ron="${esc(r.id)}" ${r.active ? 'checked' : ''}></td>
+        <td style="white-space:nowrap"><button class="btn secondary" data-rsave="${esc(r.id)}">Save</button>
+        <button class="btn ghost" data-rdel="${esc(r.id)}">Delete</button></td></tr>`).join('') || '<tr><td colspan="5">No rules.</td></tr>'}
+        </tbody></table></div>
+        <form id="ruleF" class="form" style="margin-top:8px"><div class="grid cols-3">
+          <label class="field">Code<input class="input" id="rcode" required pattern="[a-z0-9_]{2,40}" placeholder="helpful_peer"></label>
+          <label class="field">Name<input class="input" id="rname" required maxlength="80"></label>
+          <label class="field">Points<input class="input" id="rpts" type="number" required></label>
+        </div><div style="display:flex;gap:8px"><button class="btn secondary" type="submit">Add rule</button>
+        <button class="btn ghost" type="button" id="rdef">Restore defaults</button></div></form>
+        <h4>Award points</h4>
+        <form id="awardF" class="form"><div class="grid cols-3">
+          <label class="field">Student<select class="input" id="awho">${students.map((m) => `<option value="${esc(m.user_id)}">${esc(m.profile?.full_name || m.profile?.email || '')}</option>`).join('')}</select></label>
+          <label class="field">Rule<select class="input" id="arule"><option value="">Custom</option>${(rules || []).filter((r) => r.active).map((r) => `<option value="${esc(r.id)}">${esc(r.name)} (${r.points})</option>`).join('')}</select></label>
+          <label class="field">Custom points<input class="input" id="apts" type="number" placeholder="e.g. 5"></label>
+        </div><label class="field">Reason<input class="input" id="area" maxlength="300"></label>
+        <div style="display:flex;gap:8px"><button class="btn secondary" type="submit">Award</button>
+        <button class="btn ghost" type="button" id="preset">Reset class points</button></div></form>`;
+    } else {
+      html += `<h4>How points work here</h4>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${(rules || []).map((r) => `<span class="badge">${esc(r.name)}: +${r.points}</span>`).join('') || '<span style="color:var(--muted)">No rules published.</span>'}</div>`;
+    }
+    box.innerHTML = html;
+
+    if (manager) {
+      document.getElementById('lbOn').onchange = async (e) => {
+        try { Object.assign(c, (await api.update(c.id, { leaderboard_enabled: e.target.checked })).class); toast('Leaderboard updated.'); }
+        catch (err) { toast(err.message); e.target.checked = !e.target.checked; }
+      };
+      document.getElementById('lbNames').onchange = async (e) => {
+        try { Object.assign(c, (await api.update(c.id, { leaderboard_show_names: e.target.checked })).class); toast('Privacy updated.'); }
+        catch (err) { toast(err.message); e.target.checked = !e.target.checked; }
+      };
+      box.querySelectorAll('[data-rsave]').forEach((b) => (b.onclick = async () => {
+        try {
+          await api.ruleUpdate(c.id, b.dataset.rsave, {
+            points: Number(box.querySelector(`[data-rpts="${CSS.escape(b.dataset.rsave)}"]`).value),
+            active: box.querySelector(`[data-ron="${CSS.escape(b.dataset.rsave)}"]`).checked,
+          });
+          toast('Rule saved.'); render();
+        } catch (e) { toast(e.message); }
+      }));
+      box.querySelectorAll('[data-rdel]').forEach((b) => (b.onclick = async () => {
+        if (!confirm('Delete this rule? (Used rules are deactivated instead.)')) return;
+        try { const r = await api.ruleDelete(c.id, b.dataset.rdel); toast(r.deactivated ? 'Rule deactivated (has history).' : 'Rule deleted.'); render(); }
+        catch (e) { toast(e.message); }
+      }));
+      document.getElementById('ruleF').onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+          await api.ruleCreate(c.id, { code: document.getElementById('rcode').value, name: document.getElementById('rname').value, points: Number(document.getElementById('rpts').value) });
+          toast('Rule added.'); render();
+        } catch (err) { toast(err.message); }
+      };
+      document.getElementById('rdef').onclick = async () => {
+        try { await api.rulesDefaults(c.id); toast('Defaults restored.'); render(); }
+        catch (e) { toast(e.message); }
+      };
+      document.getElementById('awardF').onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+          const ruleId = document.getElementById('arule').value;
+          const body = { user_id: document.getElementById('awho').value, reason: document.getElementById('area').value };
+          if (ruleId) body.rule_id = ruleId; else body.points = Number(document.getElementById('apts').value);
+          const r = await api.awardPoints(c.id, body);
+          toast(`Awarded. Total: ${r.total}.`);
+          render();
+        } catch (err) { toast(err.message); }
+      };
+      document.getElementById('preset').onclick = async () => {
+        if (!confirm('Reset ALL points in this class?')) return;
+        try { await api.pointsReset(c.id); toast('Points reset.'); render(); }
+        catch (e) { toast(e.message); }
+      };
+    }
+  } catch (e) { box.innerHTML = stateRow('error', e.message); }
 }
 
 // ---- Sessions + events (Phase 5) ------------------------------------------------------
