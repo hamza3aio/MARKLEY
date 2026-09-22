@@ -2,6 +2,7 @@
 // Body: { purpose: content|assignment|submission, class_id, assignment_id?, name, mime, size }
 import { authContext, hasPerm, isAdmin, activeMembership } from '../_lib/auth.js';
 import { PURPOSE, validateFile, buildPath, signedUpload } from '../_lib/files.js';
+import { getPlan, planLimitError, sendPlanError, usage } from '../_lib/plans.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -22,6 +23,19 @@ export default async function handler(req, res) {
 
   const err = validateFile(purpose, name, mime, size);
   if (err) return res.status(400).json({ error: err });
+
+  // Plan gate: storage quota (admins bypass).
+  if (!isAdmin(profile)) {
+    try {
+      const u = await usage(admin, user.id);
+      const limitMb = u.features['storage_mb.max'] ?? 1024;
+      if ((u.used.storage_mb * 1048576 + size) / 1048576 > limitMb) {
+        throw planLimitError('storage_mb.max', limitMb, u.used.storage_mb);
+      }
+    } catch (e) {
+      if (sendPlanError(res, e)) return;
+    }
+  }
 
   if (purpose === 'content') {
     const ok = isAdmin(profile) || cls.teacher_id === user.id ||

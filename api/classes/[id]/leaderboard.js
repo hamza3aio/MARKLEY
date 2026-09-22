@@ -3,6 +3,7 @@
 // Privacy: anonymize unless leaderboard_show_names or caller is staff;
 // non-staff always see their own / linked students' real names.
 import { authContext, isAdmin, activeMembership } from '../../_lib/auth.js';
+import { requireFlag, sendPlanError } from '../../_lib/plans.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -14,6 +15,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed.' });
   }
   if (typeof id !== 'string') return res.status(400).json({ error: 'Invalid request.' });
+  try {
+    await requireFlag(admin, profile, 'leaderboard');
+  } catch (e) {
+    if (sendPlanError(res, e)) return;
+    return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
 
   const { data: cls } = await admin.from('classes').select('id,name,teacher_id,leaderboard_enabled,leaderboard_show_names').eq('id', id).is('deleted_at', null).single();
   if (!cls) return res.status(404).json({ error: 'Class not found.' });

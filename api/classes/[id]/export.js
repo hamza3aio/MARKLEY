@@ -2,6 +2,7 @@
 // Staff with reports.export only. Generated server-side with exceljs.
 import ExcelJS from 'exceljs';
 import { authContext, hasPerm, isAdmin, activeMembership } from '../../_lib/auth.js';
+import { requireFlag, sendPlanError } from '../../_lib/plans.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -17,6 +18,12 @@ export default async function handler(req, res) {
   }
   if (!hasPerm(permissions, 'reports.export') && !isAdmin(profile)) {
     return res.status(403).json({ error: 'You do not have permission to export reports.' });
+  }
+  try {
+    await requireFlag(admin, profile, 'exports');
+  } catch (e) {
+    if (sendPlanError(res, e)) return;
+    return res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 
   const { data: cls } = await admin.from('classes').select('id,name,teacher_id').eq('id', id).is('deleted_at', null).single();

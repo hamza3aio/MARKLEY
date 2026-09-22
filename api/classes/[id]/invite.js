@@ -3,6 +3,7 @@
 import { randomBytes } from 'node:crypto';
 import { authContext, hasPerm, isAdmin, logActivity, clientIp, activeMembership, validEmail } from '../../_lib/auth.js';
 import { notifyUsers, sendEmail, appLink } from '../../_lib/email.js';
+import { getPlan, planLimitError, sendPlanError } from '../../_lib/plans.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -36,6 +37,19 @@ export default async function handler(req, res) {
   }
 
   const normEmail = email.trim().toLowerCase();
+  // Plan gate: students in class (+ pending student invites) vs owner's limit.
+  try {
+    const { data: owner } = await admin.from('profiles').select('role').eq('id', cls.teacher_id).single();
+    if (owner?.role !== 'admin' && role_in_class === 'student') {
+      const { features } = await getPlan(admin, cls.teacher_id);
+      const { count: inClass } = await admin.from('class_members').select('id', { count: 'exact', head: true }).eq('class_id', id).eq('role_in_class', 'student').eq('status', 'active');
+      const { count: pending } = await admin.from('class_invitations').select('id', { count: 'exact', head: true }).eq('class_id', id).eq('role_in_class', 'student').eq('status', 'pending');
+      const used = (inClass ?? 0) + (pending ?? 0);
+      if (used >= (features['students_per_class.max'] ?? 50)) throw planLimitError('students_per_class.max', features['students_per_class.max'] ?? 50, used);
+    }
+  } catch (e) {
+    if (sendPlanError(res, e)) return;
+  }
   // Already an active member?
   const { data: existing } = await admin.from('profiles').select('id').eq('email', normEmail).single();
   if (existing) {

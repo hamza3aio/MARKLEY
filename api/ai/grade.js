@@ -2,6 +2,7 @@
 // Stores a pending suggestion; NEVER writes a final grade.
 import { authContext, hasPerm, isAdmin, activeMembership } from '../_lib/auth.js';
 import { aiConfig, suggestGrade, logAI } from '../_lib/ai.js';
+import { checkAIGate } from '../_lib/plans.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -13,6 +14,7 @@ export default async function handler(req, res) {
   }
   const cfg = aiConfig();
   if (cfg.error) return res.status(503).json({ error: cfg.error });
+  if (await checkAIGate(admin, profile, user, res)) return;
 
   const { assignment_id, student_id } = req.body || {};
   if (typeof assignment_id !== 'string' || typeof student_id !== 'string') {

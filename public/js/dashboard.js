@@ -40,6 +40,8 @@ const tabs = [
   { id: 'invitations', label: 'Invitations' },
 ];
 if (['parent', 'teacher', 'admin'].includes(profile.role)) tabs.push({ id: 'students', label: 'Students' });
+if (profile.role === 'admin' || can('plans.manage')) tabs.push({ id: 'plans', label: 'Plans' });
+else if (profile.role === 'teacher' || profile.role === 'assistant') tabs.push({ id: 'plan', label: 'My plan' });
 tabs.push(
   { id: 'activity', label: profile.role === 'admin' ? 'Activity log (global)' : 'My activity' },
   { id: 'settings', label: 'Settings' },
@@ -124,6 +126,8 @@ async function render() {
   if (current === 'quizzes') return renderQuizzesHome();
   if (current === 'invitations') return renderInvitations();
   if (current === 'students') return renderStudents();
+  if (current === 'plans') return renderPlansAdmin();
+  if (current === 'plan') return renderMyPlan();
   if (current === 'activity') return renderActivity();
   return renderSettings();
 }
@@ -1579,6 +1583,147 @@ async function loadAnalyticsSection(classId) {
       } catch { /* table remains the source of truth */ }
     }
   } catch (e) { box.innerHTML = stateRow('error', e.message); }
+}
+
+// ---- Plans (Phase 9) ---------------------------------------------------------------------------------
+const PLAN_LIMITS = ['classes.max', 'students_per_class.max', 'storage_mb.max', 'ai_monthly.max'];
+const PLAN_FLAGS = ['ai_tools', 'exports', 'analytics', 'leaderboard', 'sessions'];
+
+async function renderPlansAdmin() {
+  main.innerHTML = stateRow('loading', 'Loading plans…');
+  try {
+    const { plans } = await api.plans();
+    const { requests } = await api.planRequests().catch(() => ({ requests: [] }));
+    main.innerHTML = `
+      <section class="card"><h2 style="margin-top:0">Plans</h2>
+        <p style="color:var(--muted)">Students and parents always use the free plan and are never charged. Billing integrates later without rebuilds.</p>
+        ${plans.map((p) => `
+        <div class="card" data-plan="${esc(p.id)}" style="margin-bottom:12px">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <b>${esc(p.name)}</b><code>${esc(p.slug)}</code>
+            ${p.price_monthly ? `<span>${esc(String(p.price_monthly))}/mo</span>` : '<span class="badge success">free</span>'}
+            ${p.is_default ? '<span class="badge">default</span>' : ''}
+            ${p.is_active ? '' : '<span class="badge danger">inactive</span>'}
+            <div style="flex:1"></div>
+            <button class="btn ghost" data-pdel="${esc(p.id)}">Delete</button>
+          </div>
+          <div class="grid cols-3" style="margin-top:8px">
+            ${PLAN_LIMITS.map((k) => `<label class="field">${esc(k)}<input class="input" type="number" min="0" data-f="${esc(k)}" value="${p.features?.[k] ?? ''}"></label>`).join('')}
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:14px">
+            ${PLAN_FLAGS.map((k) => `<label><input type="checkbox" data-f="${esc(k)}" ${p.features?.[k] ? 'checked' : ''}> ${esc(k)}</label>`).join('')}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <label class="field">Price/mo<input class="input" type="number" min="0" step="0.01" data-price value="${p.price_monthly ?? ''}" style="width:120px"></label>
+            <label style="font-size:14px"><input type="checkbox" data-active ${p.is_active ? 'checked' : ''}> Active</label>
+            <button class="btn secondary" data-psave="${esc(p.id)}">Save plan</button>
+          </div></div>`).join('')}
+      </section>
+      <section class="card"><h3 style="margin-top:0">Create plan</h3>
+        <form id="plF" class="form"><div class="grid cols-3">
+          <label class="field">Name<input class="input" id="plname" required maxlength="80"></label>
+          <label class="field">Slug<input class="input" id="plslug" required pattern="[a-z0-9_]{2,40}" placeholder="school_pro"></label>
+          <label class="field">Price/mo (blank = custom)<input class="input" id="plprice" type="number" min="0" step="0.01"></label>
+        </div><button class="btn" type="submit">Create (copies free features)</button></form></section>
+      <section class="card"><h3 style="margin-top:0">Assign plan</h3>
+        <form id="asF" class="form"><div class="grid cols-2">
+          <label class="field">Teacher email<input class="input" id="asemail" type="email" required></label>
+          <label class="field">Plan<select class="input" id="asplan">${plans.filter((p) => p.is_active).map((p) => `<option value="${esc(p.slug)}">${esc(p.name)}</option>`).join('')}</select></label>
+        </div><button class="btn secondary" type="submit">Assign</button></form>
+        <p style="color:var(--muted);font-size:13px">Plans can only be assigned to teachers/admins — never students or parents.</p></section>
+      <section class="card"><h3 style="margin-top:0">Custom-plan requests (${requests.length})</h3>
+        ${requests.length ? `<div class="table-wrap"><table><thead><tr><th>From</th><th>Message</th><th>Status</th><th></th></tr></thead><tbody>
+        ${requests.map((r) => `<tr><td>${esc(r.name)}<br><small>${esc(r.email)} · ${esc(r.organization || '')}</small></td>
+        <td>${esc(r.message.slice(0, 120))}</td><td><span class="badge">${esc(r.status)}</span></td>
+        <td style="white-space:nowrap">${['contacted', 'closed', 'pending'].filter((s) => s !== r.status).map((s) => `<button class="btn ghost" data-rst="${esc(r.id)}:${s}">${s}</button>`).join('')}</td></tr>`).join('')}
+        </tbody></table></div>` : stateRow('empty', 'No requests.')}</section>`;
+    main.querySelectorAll('[data-psave]').forEach((b) => (b.onclick = async () => {
+      const card = main.querySelector(`[data-plan="${CSS.escape(b.dataset.psave)}"]`);
+      const features = {};
+      card.querySelectorAll('[data-f]').forEach((inp) => {
+        features[inp.dataset.f] = inp.type === 'checkbox' ? (inp.checked ? 1 : 0) : Number(inp.value || 0);
+      });
+      try {
+        await api.planUpdate(b.dataset.psave, {
+          price_monthly: card.querySelector('[data-price]').value === '' ? null : Number(card.querySelector('[data-price]').value),
+          is_active: card.querySelector('[data-active]').checked,
+        });
+        await api.planFeatures(b.dataset.psave, features);
+        toast('Plan saved.');
+        render();
+      } catch (e) { toast(e.message + (e.code === 'plan_limit' ? ' See My plan.' : '')); }
+    }));
+    main.querySelectorAll('[data-pdel]').forEach((b) => (b.onclick = async () => {
+      if (!confirm('Delete this plan? (Plans in use are deactivated instead.)')) return;
+      try { const r = await api.planDelete(b.dataset.pdel); toast(r.deactivated ? 'Deactivated (in use).' : 'Deleted.'); render(); }
+      catch (e) { toast(e.message); }
+    }));
+    main.querySelectorAll('[data-rst]').forEach((b) => (b.onclick = async () => {
+      const [id, st] = b.dataset.rst.split(':');
+      try { await api.planRequestStatus(id, st); toast('Updated.'); render(); }
+      catch (e) { toast(e.message); }
+    }));
+    document.getElementById('plF').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const pv = document.getElementById('plprice').value;
+        await api.planCreate({ name: document.getElementById('plname').value, slug: document.getElementById('plslug').value, price_monthly: pv === '' ? null : Number(pv) });
+        toast('Plan created.');
+        render();
+      } catch (err) { toast(err.message); }
+    };
+    document.getElementById('asF').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await api.planAssign({ user_email: document.getElementById('asemail').value, plan_slug: document.getElementById('asplan').value });
+        toast('Plan assigned.');
+      } catch (err) { toast(err.message); }
+    };
+  } catch (e) { main.innerHTML = stateRow('error', e.message); }
+}
+
+async function renderMyPlan() {
+  main.innerHTML = stateRow('loading', 'Loading plan…');
+  try {
+    const { plan, features, used } = await api.myPlan();
+    const bar = (u, l) => {
+      const pct = l ? Math.min(100, Math.round((u / l) * 100)) : 0;
+      return `<div style="background:var(--border);border-radius:6px;height:8px"><div style="width:${pct}%;background:var(--primary);height:8px;border-radius:6px"></div></div>`;
+    };
+    main.innerHTML = `
+      <section class="card"><h2 style="margin-top:0">My plan: ${esc(plan?.name || 'Free')}</h2>
+        <p style="color:var(--muted)">Students and parents never pay. Limits below apply to your teacher account.</p>
+        ${['classes.max', 'storage_mb.max', 'ai_monthly.max'].map((k) => {
+          const u = k === 'classes.max' ? used.classes : k === 'storage_mb.max' ? used.storage_mb : used.ai_monthly;
+          const l = features[k] ?? '—';
+          const unit = k === 'storage_mb.max' ? ' MB' : '';
+          return `<p><b>${esc(k)}</b>: ${u}${unit} / ${l}${unit}</p>${typeof l === 'number' ? bar(u, l) : ''}`;
+        }).join('')}
+        <p>Students per class limit: <b>${features['students_per_class.max'] ?? '—'}</b></p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${PLAN_FLAGS.map((k) => `<span class="badge ${features[k] ? 'success' : 'danger'}">${esc(k)}${features[k] ? '' : ' (off)'}</span>`).join('')}</div>
+      </section>
+      <section class="card"><h3 style="margin-top:0">Need more? Contact sales</h3>
+        <form id="rqF" class="form">
+          <div class="grid cols-2">
+            <label class="field">Name<input class="input" id="rqname" required maxlength="120" value="${esc(profile.full_name || '')}"></label>
+            <label class="field">Email<input class="input" id="rqemail" type="email" required value="${esc(profile.email)}"></label>
+          </div>
+          <label class="field">Organization<input class="input" id="rqorg" maxlength="200" placeholder="School name"></label>
+          <label class="field">What do you need?<textarea class="input" id="rqmsg" rows="3" required minlength="10" maxlength="3000" placeholder="e.g. 20 classes and 500 students for our school"></textarea></label>
+          <button class="btn" type="submit">Send request</button>
+        </form></section>`;
+    document.getElementById('rqF').onsubmit = async (e) => {
+      e.preventDefault();
+      try {
+        await api.planRequestCreate({
+          name: document.getElementById('rqname').value, email: document.getElementById('rqemail').value,
+          organization: document.getElementById('rqorg').value, message: document.getElementById('rqmsg').value,
+        });
+        toast('Request sent. Sales will contact you.');
+        render();
+      } catch (err) { toast(err.message); }
+    };
+  } catch (e) { main.innerHTML = stateRow('error', e.message); }
 }
 
 // ---- Activity / settings (Phase 1, unchanged) ----------------------------------

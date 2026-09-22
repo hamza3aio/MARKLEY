@@ -1,6 +1,7 @@
 // /api/classes/:id/sessions — GET list, POST create (staff). Notifies members + email.
 import { authContext, isAdmin, logActivity, clientIp, activeMembership } from '../../_lib/auth.js';
 import { notifyUsers, sendEmail, appLink } from '../../_lib/email.js';
+import { requireFlag, sendPlanError } from '../../_lib/plans.js';
 
 const PROVIDERS = ['zoom', 'teams', 'meet', 'other'];
 
@@ -13,6 +14,12 @@ export default async function handler(req, res) {
 
   const { data: cls } = await admin.from('classes').select('id,name,teacher_id').eq('id', id).is('deleted_at', null).single();
   if (!cls) return res.status(404).json({ error: 'Class not found.' });
+  try {
+    await requireFlag(admin, profile, 'sessions');
+  } catch (e) {
+    if (sendPlanError(res, e)) return;
+    return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
   const member = await activeMembership(admin, id, user.id);
   const staff = isAdmin(profile) || cls.teacher_id === user.id ||
     (!!member && (member.role_in_class === 'teacher' || member.role_in_class === 'assistant'));

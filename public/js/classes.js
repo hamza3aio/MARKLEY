@@ -7,7 +7,12 @@ export function createClassesApi(session) {
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, ...(opts.headers || {}) },
     });
     const b = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(b.error || 'Something went wrong. Please try again.');
+    if (!r.ok) {
+      const err = new Error(b.error || 'Something went wrong. Please try again.');
+      err.code = b.code;
+      err.feature = b.feature;
+      throw err;
+    }
     return b;
   }
   return {
@@ -85,5 +90,15 @@ export function createClassesApi(session) {
     quizDelete: (id) => call('/api/quizzes/' + encodeURIComponent(id), { method: 'DELETE' }),
     quizAttempts: (id) => call(`/api/quizzes/${encodeURIComponent(id)}/attempts`),
     quizSubmit: (id, answers) => call(`/api/quizzes/${encodeURIComponent(id)}/attempts`, { method: 'POST', body: JSON.stringify({ answers }) }),
+    myPlan: () => call('/api/user-plans'),
+    plans: () => call('/api/plans'),
+    planCreate: (body) => call('/api/plans', { method: 'POST', body: JSON.stringify(body) }),
+    planUpdate: (id, body) => call('/api/plans/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify(body) }),
+    planDelete: (id) => call('/api/plans/' + encodeURIComponent(id), { method: 'DELETE' }),
+    planFeatures: (id, features) => call(`/api/plans/${encodeURIComponent(id)}/features`, { method: 'PUT', body: JSON.stringify({ features }) }),
+    planAssign: (body) => call('/api/user-plans', { method: 'POST', body: JSON.stringify(body) }),
+    planRequests: () => call('/api/plan-requests'),
+    planRequestCreate: (body) => call('/api/plan-requests', { method: 'POST', body: JSON.stringify(body) }),
+    planRequestStatus: (id, status) => call('/api/plan-requests/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ status }) }),
   };
 }

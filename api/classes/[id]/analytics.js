@@ -1,6 +1,7 @@
 // /api/classes/:id/analytics — staff overview; students see own row; parents see linked rows.
 // Query: ?from=YYYY-MM-DD&to=YYYY-MM-DD (defaults: last 90 days), ?student_id= (staff).
 import { authContext, isAdmin, activeMembership } from '../../_lib/auth.js';
+import { requireFlag, sendPlanError } from '../../_lib/plans.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -10,6 +11,12 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed.' });
+  }
+  try {
+    await requireFlag(admin, profile, 'analytics');
+  } catch (e) {
+    if (sendPlanError(res, e)) return;
+    return res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
   if (typeof id !== 'string') return res.status(400).json({ error: 'Invalid request.' });
 

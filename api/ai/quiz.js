@@ -1,7 +1,8 @@
 // POST /api/ai/quiz — generate a quiz draft (not saved). Any active user.
 // Body: { subject, topic, difficulty, count, kinds[], class_id? }
-import { authContext, activeMembership } from '../_lib/auth.js';
+import { authContext, isAdmin, activeMembership } from '../_lib/auth.js';
 import { aiConfig, generateQuiz, logAI } from '../_lib/ai.js';
+import { checkAIGate } from '../_lib/plans.js';
 
 const DIFF = ['easy', 'medium', 'hard'];
 const KINDS = ['mcq', 'short', 'essay'];
@@ -26,13 +27,14 @@ function cleanQuestions(qs, max) {
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
   if (!ctx) return;
-  const { user, admin } = ctx;
+  const { user, profile, admin } = ctx;
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed.' });
   }
   const cfg = aiConfig();
   if (cfg.error) return res.status(503).json({ error: cfg.error });
+  if (await checkAIGate(admin, profile, user, res)) return;
 
   const { subject, topic, difficulty = 'medium', count = 5, kinds = ['mcq'], class_id } = req.body || {};
   if (typeof subject !== 'string' || !subject.trim() || subject.trim().length > 80) {

@@ -1,6 +1,7 @@
 // /api/classes — GET: classes I can access. POST: create (class.create required).
 import { authContext, hasPerm, isAdmin, logActivity, clientIp, validEmail } from '../_lib/auth.js';
 import { seedDefaultRules } from '../_lib/points.js';
+import { getPlan, planLimitError, sendPlanError } from '../_lib/plans.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -70,6 +71,18 @@ export default async function handler(req, res) {
       teacherId = t.id;
     } else if (profile.role !== 'teacher' && !isAdmin(profile)) {
       return res.status(403).json({ error: 'Only teachers can own classes.' });
+    }
+
+    // Plan gate: class count of the owner vs classes.max (admins bypass).
+    try {
+      const { data: owner } = await admin.from('profiles').select('role').eq('id', teacherId).single();
+      if (owner?.role !== 'admin') {
+        const { features } = await getPlan(admin, teacherId);
+        const { count } = await admin.from('classes').select('id', { count: 'exact', head: true }).eq('teacher_id', teacherId).is('deleted_at', null);
+        if ((count ?? 0) >= (features['classes.max'] ?? 5)) throw planLimitError('classes.max', features['classes.max'] ?? 5, count ?? 0);
+      }
+    } catch (e) {
+      if (sendPlanError(res, e)) return;
     }
 
     const { data: cls, error } = await admin.from('classes').insert({

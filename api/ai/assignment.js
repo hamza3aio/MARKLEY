@@ -2,6 +2,7 @@
 // Body: { subject, topic, difficulty, instructions, count, type }
 import { authContext, hasPerm, isAdmin } from '../_lib/auth.js';
 import { aiConfig, generateAssignment, logAI } from '../_lib/ai.js';
+import { checkAIGate } from '../_lib/plans.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -16,6 +17,7 @@ export default async function handler(req, res) {
   }
   const cfg = aiConfig();
   if (cfg.error) return res.status(503).json({ error: cfg.error });
+  if (await checkAIGate(admin, profile, user, res)) return;
 
   const { subject, topic, difficulty = 'medium', instructions = '', count = 5, type = 'normal' } = req.body || {};
   if (typeof subject !== 'string' || !subject.trim() || subject.trim().length > 80) {
