@@ -3,6 +3,7 @@
 import { authContext, hasPerm, isAdmin, activeMembership } from '../_lib/auth.js';
 import { aiConfig, suggestGrade, logAI } from '../_lib/ai.js';
 import { checkAIGate } from '../_lib/plans.js';
+import { rateLimit } from '../_lib/rate.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -14,6 +15,7 @@ export default async function handler(req, res) {
   }
   const cfg = aiConfig();
   if (cfg.error) return res.status(503).json({ error: cfg.error });
+  if (rateLimit(req, res, { max: 20, prefix: 'ai-grade' })) return;
   if (await checkAIGate(admin, profile, user, res)) return;
 
   const { assignment_id, student_id } = req.body || {};

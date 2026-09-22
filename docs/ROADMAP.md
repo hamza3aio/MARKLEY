@@ -8,7 +8,8 @@
 - [x] Phase 6: points, leaderboards, achievements (done)
 - [x] Phase 7: exams + mark schemes (done)
 - [x] Phase 8: AI quiz/assignment/grading (done)
-- [x] Phase 9: plans + limits (this commit)
+- [x] Phase 9: plans + limits (done)
+- [x] Phase 10: audit, testing, deployment (this commit)
 - [ ] Phase 3: Supabase Storage, assignments (guided/normal), submissions, mobile PDF scanner
 - [ ] Phase 4: manual grading, analytics, attendance, xlsx export (SheetJS server-side)
 - [ ] Phase 5: calendar, sessions (external links), Resend EmailService abstraction

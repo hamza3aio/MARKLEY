@@ -1,7 +1,7 @@
 // /api/exams/:id — GET detail with signed URLs (any active user).
 // PATCH/DELETE (exams.manage). Mark-scheme changes are activity-logged.
 import { authContext, hasPerm, isAdmin, logActivity, clientIp } from '../_lib/auth.js';
-import { PURPOSE, signedDownload } from '../_lib/files.js';
+import { PURPOSE, signedDownload, objectExists } from '../_lib/files.js';
 
 const SESSIONS = ['Feb/March', 'May/June', 'Oct/Nov'];
 
@@ -69,6 +69,9 @@ export default async function handler(req, res) {
         else {
           if (typeof ref?.path !== 'string' || !ref.path.startsWith(`exams/${id}/`) || typeof ref?.name !== 'string') {
             return res.status(400).json({ error: 'Invalid file reference.' });
+          }
+          if (!(await objectExists(admin, PURPOSE.exam_question.bucket, ref.path))) {
+            return res.status(400).json({ error: 'Upload not found. Please upload the file first.' });
           }
           patch[field] = ref.path; patch[nameField] = ref.name.trim().slice(0, 255);
         }

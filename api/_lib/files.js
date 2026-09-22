@@ -66,3 +66,15 @@ export async function signedDownload(admin, bucket, path, expiresIn = 3600) {
   if (error || !data) return null;
   return data.signedUrl;
 }
+
+// Confirm an object actually exists (closes dangling-row issue where a client
+// confirms a path without uploading bytes first).
+export async function objectExists(admin, bucket, path) {
+  const slash = path.lastIndexOf('/');
+  if (slash < 0) return false;
+  const dir = path.slice(0, slash);
+  const base = path.slice(slash + 1);
+  const { data, error } = await admin.storage.from(bucket).list(dir, { limit: 10, search: base.slice(0, 40) });
+  if (error || !data) return false;
+  return data.some((o) => o.name === base);
+}

@@ -1,5 +1,6 @@
 // /api/plan-requests — GET inbox (plans.manage), POST contact sales (any active user).
 import { authContext, hasPerm, isAdmin, validEmail } from '../_lib/auth.js';
+import { rateLimit } from '../_lib/rate.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -16,6 +17,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
+    if (rateLimit(req, res, { max: 10, prefix: 'plan-req' })) return;
     if (profile.role !== 'teacher' && profile.role !== 'admin' && profile.role !== 'assistant') {
       return res.status(403).json({ error: 'Custom plans are for teachers and schools.' });
     }

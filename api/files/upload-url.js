@@ -3,6 +3,7 @@
 import { authContext, hasPerm, isAdmin, activeMembership } from '../_lib/auth.js';
 import { PURPOSE, validateFile, buildPath, signedUpload } from '../_lib/files.js';
 import { getPlan, planLimitError, sendPlanError, usage } from '../_lib/plans.js';
+import { rateLimit } from '../_lib/rate.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -14,6 +15,7 @@ export default async function handler(req, res) {
   }
   const { purpose, class_id, assignment_id, name, mime, size } = req.body || {};
   if (!PURPOSE[purpose]) return res.status(400).json({ error: 'Invalid upload purpose.' });
+  if (rateLimit(req, res, { max: 30, prefix: 'upload-url' })) return;
   if (typeof class_id !== 'string') return res.status(400).json({ error: 'Invalid request.' });
 
   const { data: cls } = await admin.from('classes').select('id,teacher_id').eq('id', class_id).is('deleted_at', null).single();

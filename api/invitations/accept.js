@@ -1,6 +1,7 @@
 // /api/invitations/accept — POST { token }: join class via invitation.
 // Validates token, expiry, email match, role match, single-use. IDOR-safe.
 import { authContext, logActivity, clientIp } from '../_lib/auth.js';
+import { rateLimit } from '../_lib/rate.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -10,6 +11,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed.' });
   }
+  if (rateLimit(req, res, { max: 10, prefix: 'invite-accept' })) return;
   const { token } = req.body || {};
   if (typeof token !== 'string' || token.length < 32 || token.length > 128) {
     return res.status(400).json({ error: 'Invalid invitation.' });

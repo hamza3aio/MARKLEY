@@ -2,7 +2,7 @@
 
 Vercel-native educational platform for IGCSE students in Egypt. English only.
 
-**Stack (per owner decision):** static frontend (HTML5/CSS3/JS) on Vercel + Node serverless `/api` + Supabase (Postgres, Auth, Storage). No PHP — PHP cannot run as a persistent server on Vercel, so the backend is serverless JS with the same REST separation the spec required. AI is deferred (abstraction lands in Phase 8).
+**Stack (per owner decision):** static frontend (HTML5/CSS3/JS) on Vercel + Node serverless `/api` + Supabase (Postgres, Auth, Storage). No PHP — PHP cannot run as a persistent server on Vercel, so the backend is serverless JS with the same REST separation the spec required.
 
 ## Phase 1 (done)
 - Project structure, env handling, docs; Supabase schema + RLS + seed
@@ -30,22 +30,26 @@ Vercel-native educational platform for IGCSE students in Egypt. English only.
 ## Phase 8 (done)
 - AIService, quiz/assignment generation, practice quizzes, assisted grading
 
-## Phase 9 scope (this commit)
-- Plans (free default + custom), feature flags + limits enforced server-side
-- Gates: class count, class size, storage quota, AI quota, exports/analytics/leaderboard/sessions
-- Students/parents never charged; admin manager + teacher usage + sales requests
+## Phase 9 (done)
+- Plans, limits, custom requests, server-side gates
 
-Phases 3–10 follow `docs/ROADMAP.md`.
+## Phase 10 scope (this commit)
+- Security audit (`docs/AUDIT.md`), upload-existence checks, rate limits, hardened headers
+- Full test plan (`docs/TESTING.md`), `npm test` static gate
+- Final deployment + production docs
+
+All 10 phases complete. See `docs/ROADMAP.md` for the full history.
 
 ## Requirements
 - Node 18+, Vercel CLI (`npm i -g vercel`), Supabase project, GitHub repo connected
 
 ## Local development
-1. `cp .env.example .env.local` — fill `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-2. In Supabase SQL editor run in order: `database/schema.sql`, `database/rls.sql`, `database/seed.sql`
+1. `cp .env.example .env.local` — fill at minimum `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+2. In Supabase SQL editor run in order: `database/schema.sql`, `database/rls.sql`, `database/seed.sql`, then `database/migrations/002` through `009` in numeric order
 3. Supabase Auth: enable Email provider + **Confirm email** ON
-4. `npm install` then `vercel dev` (serves `/public` + `/api` with env from `.env.local`)
+4. `npm install` then `npm test` (static gate), then `vercel dev` (serves `/public` + `/api` with env from `.env.local`)
 5. Create demo users via Supabase Auth, then activate per `database/seed.sql` comments
+6. Work through `docs/TESTING.md` before promoting Preview to Production
 
 ## Environment variables (Vercel > Settings > Environment Variables)
 - `SUPABASE_URL` (all environments)
@@ -54,12 +58,13 @@ Phases 3–10 follow `docs/ROADMAP.md`.
 - `APP_URL` (production URL)
 - `RESEND_API_KEY` + `RESEND_FROM` (server-only; emails skipped if unset)
 - `CRON_SECRET` (authorizes `/api/cron/session-reminders`)
-- Later: `AI_API_KEY`, `AI_PROVIDER`
+- `AI_PROVIDER`, `AI_API_URL`, `AI_API_KEY`, `AI_MODEL` (server-only; AI returns 503 without key)
+- Billing later: no code changes needed — add provider keys and price logic on top of `plans` (see `docs/ARCHITECTURE.md`)
 
 ## Deploy
 See `docs/VERCEL_DEPLOY.md` (GitHub → Vercel, env, domain, Supabase wiring). Backend and frontend deploy together — `/api` is the backend.
 
 ## Security notes
-- Service-role key only in serverless env. CSP headers in `vercel.json`.
+- Service-role key only in serverless env. CSP + HSTS + Permissions-Policy in `vercel.json`.
 - RLS denies all browser writes; mutations go through `/api` with JWT verification + `role_permissions` checks.
-- Generic error messages to clients; details stay server-side. See `docs/SECURITY.md`.
+- Generic error messages to clients; details stay server-side. See `docs/SECURITY.md`, `docs/AUDIT.md`, `docs/TESTING.md`.

@@ -3,6 +3,7 @@
 import { authContext, isAdmin, activeMembership } from '../_lib/auth.js';
 import { aiConfig, generateQuiz, logAI } from '../_lib/ai.js';
 import { checkAIGate } from '../_lib/plans.js';
+import { rateLimit } from '../_lib/rate.js';
 
 const DIFF = ['easy', 'medium', 'hard'];
 const KINDS = ['mcq', 'short', 'essay'];
@@ -34,6 +35,7 @@ export default async function handler(req, res) {
   }
   const cfg = aiConfig();
   if (cfg.error) return res.status(503).json({ error: cfg.error });
+  if (rateLimit(req, res, { max: 20, prefix: 'ai-quiz' })) return;
   if (await checkAIGate(admin, profile, user, res)) return;
 
   const { subject, topic, difficulty = 'medium', count = 5, kinds = ['mcq'], class_id } = req.body || {};

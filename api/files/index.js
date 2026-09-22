@@ -1,7 +1,7 @@
 // /api/files — GET ?class_id= list content (+ signed download URLs).
 // POST confirm a content upload { class_id, path, name, mime, size, description?, visibility? }.
 import { authContext, hasPerm, isAdmin, logActivity, clientIp, activeMembership } from '../_lib/auth.js';
-import { PURPOSE, validateFile, signedDownload } from '../_lib/files.js';
+import { PURPOSE, validateFile, signedDownload, objectExists } from '../_lib/files.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -49,6 +49,9 @@ export default async function handler(req, res) {
     if (!path.startsWith(`class/${class_id}/content/`)) return res.status(400).json({ error: 'Invalid upload path.' });
     if (typeof description !== 'string' || description.length > 1000) return res.status(400).json({ error: 'Description is too long.' });
     if (!['class', 'teachers'].includes(visibility)) return res.status(400).json({ error: 'Invalid visibility.' });
+    if (!(await objectExists(admin, PURPOSE.content.bucket, path))) {
+      return res.status(400).json({ error: 'Upload not found. Please upload the file first.' });
+    }
     const { data, error } = await admin.from('files').insert({
       class_id, uploaded_by: user.id, name: String(name).trim(), description: description.trim(),
       mime, size_bytes: size, storage_path: path, visibility,

@@ -1,6 +1,6 @@
 // /api/exams/:id/resources — GET list, POST confirm upload, DELETE remove (write: exams.manage).
 import { authContext, hasPerm, isAdmin } from '../../_lib/auth.js';
-import { PURPOSE, validateFile, signedDownload } from '../../_lib/files.js';
+import { PURPOSE, validateFile, signedDownload, objectExists } from '../../_lib/files.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -29,6 +29,9 @@ export default async function handler(req, res) {
     const err = validateFile('exam_resource', name, mime, size);
     if (err) return res.status(400).json({ error: err });
     if (typeof path !== 'string' || !path.startsWith(prefix)) return res.status(400).json({ error: 'Invalid upload path.' });
+    if (!(await objectExists(admin, PURPOSE.exam_resource.bucket, path))) {
+      return res.status(400).json({ error: 'Upload not found. Please upload the file first.' });
+    }
     if (typeof label !== 'string' || !label.trim() || label.trim().length > 120) {
       return res.status(400).json({ error: 'Label is required (max 120 chars).' });
     }

@@ -1,7 +1,7 @@
 // /api/assignments/:id/submissions — GET (staff: all with students + file URLs),
 // POST (student: submit text + pre-uploaded files; guided requires text, normal requires file).
 import { authContext, isAdmin, logActivity, clientIp, activeMembership } from '../../_lib/auth.js';
-import { PURPOSE, validateFile, signedDownload } from '../../_lib/files.js';
+import { PURPOSE, validateFile, signedDownload, objectExists } from '../../_lib/files.js';
 import { awardRule, grantAchievement } from '../../_lib/points.js';
 
 export default async function handler(req, res) {
@@ -64,6 +64,9 @@ export default async function handler(req, res) {
       if (err) return res.status(400).json({ error: err });
       if (typeof f?.path !== 'string' || !f.path.startsWith(prefix)) {
         return res.status(400).json({ error: 'Invalid file reference.' });
+      }
+      if (!(await objectExists(admin, PURPOSE.submission.bucket, f.path))) {
+        return res.status(400).json({ error: `Upload not found: ${(f.name || '').slice(0, 60)}.` });
       }
     }
 

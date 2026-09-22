@@ -1,7 +1,7 @@
 // /api/assignments/:id/attachments — GET list, POST confirm, DELETE remove.
 // Confirm: teacher/admin of the class only. Paths must match the assignment prefix.
 import { authContext, isAdmin, activeMembership } from '../../_lib/auth.js';
-import { PURPOSE, validateFile, signedDownload } from '../../_lib/files.js';
+import { PURPOSE, validateFile, signedDownload, objectExists } from '../../_lib/files.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -38,6 +38,9 @@ export default async function handler(req, res) {
     const err = validateFile('assignment', name, mime, size);
     if (err) return res.status(400).json({ error: err });
     if (typeof path !== 'string' || !path.startsWith(prefix)) return res.status(400).json({ error: 'Invalid upload path.' });
+    if (!(await objectExists(admin, PURPOSE.assignment.bucket, path))) {
+      return res.status(400).json({ error: 'Upload not found. Please upload the file first.' });
+    }
     const { data, error } = await admin.from('assignment_attachments').insert({
       assignment_id: id, name: String(name).trim(), mime, size_bytes: size, storage_path: path,
     }).select().single();

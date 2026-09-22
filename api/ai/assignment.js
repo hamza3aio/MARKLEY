@@ -3,6 +3,7 @@
 import { authContext, hasPerm, isAdmin } from '../_lib/auth.js';
 import { aiConfig, generateAssignment, logAI } from '../_lib/ai.js';
 import { checkAIGate } from '../_lib/plans.js';
+import { rateLimit } from '../_lib/rate.js';
 
 export default async function handler(req, res) {
   const ctx = await authContext(req, res);
@@ -17,6 +18,7 @@ export default async function handler(req, res) {
   }
   const cfg = aiConfig();
   if (cfg.error) return res.status(503).json({ error: cfg.error });
+  if (rateLimit(req, res, { max: 20, prefix: 'ai-asg' })) return;
   if (await checkAIGate(admin, profile, user, res)) return;
 
   const { subject, topic, difficulty = 'medium', instructions = '', count = 5, type = 'normal' } = req.body || {};
