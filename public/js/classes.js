@@ -73,5 +73,17 @@ export function createClassesApi(session) {
     examResources: (id) => call(`/api/exams/${encodeURIComponent(id)}/resources`),
     examResourceAdd: (id, body) => call(`/api/exams/${encodeURIComponent(id)}/resources`, { method: 'POST', body: JSON.stringify(body) }),
     examResourceDelete: (id, resourceId) => call(`/api/exams/${encodeURIComponent(id)}/resources`, { method: 'DELETE', body: JSON.stringify({ resource_id: resourceId }) }),
+    aiQuiz: (body) => call('/api/ai/quiz', { method: 'POST', body: JSON.stringify(body) }),
+    aiAssignment: (body) => call('/api/ai/assignment', { method: 'POST', body: JSON.stringify(body) }),
+    aiGrade: (body) => call('/api/ai/grade', { method: 'POST', body: JSON.stringify(body) }),
+    aiSuggestions: (assignmentId) => call('/api/ai/suggestions?assignment_id=' + encodeURIComponent(assignmentId)),
+    aiResolve: (sugId, body) => call(`/api/ai/suggestions/${encodeURIComponent(sugId)}/resolve`, { method: 'POST', body: JSON.stringify(body) }),
+    quizzesList: () => call('/api/quizzes'),
+    quizSave: (body) => call('/api/quizzes', { method: 'POST', body: JSON.stringify(body) }),
+    quizDetail: (id) => call('/api/quizzes/' + encodeURIComponent(id)),
+    quizUpdate: (id, body) => call('/api/quizzes/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify(body) }),
+    quizDelete: (id) => call('/api/quizzes/' + encodeURIComponent(id), { method: 'DELETE' }),
+    quizAttempts: (id) => call(`/api/quizzes/${encodeURIComponent(id)}/attempts`),
+    quizSubmit: (id, answers) => call(`/api/quizzes/${encodeURIComponent(id)}/attempts`, { method: 'POST', body: JSON.stringify({ answers }) }),
   };
 }

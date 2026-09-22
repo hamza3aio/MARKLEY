@@ -24,10 +24,15 @@ Vercel-native educational platform for IGCSE students in Egypt. English only.
 ## Phase 6 (done)
 - Per-class point rules, auto-awards, leaderboards, achievements
 
-## Phase 7 scope (this commit)
-- Public exam library (subjects, boards, years, sessions, papers)
-- Search + filters + pagination, question papers + mark schemes (PDF)
-- Additional resources, admin CRUD, activity-logged mark-scheme changes
+## Phase 7 (done)
+- Public exam library, mark schemes, resources
+
+## Phase 8 scope (this commit)
+- Provider-agnostic AIService (OpenAI-compatible, keys server-only, usage tracking)
+- AI quiz generator (MCQ/short/essay, validated output, personal-by-default)
+- Practice quizzes (take, MCQ auto-grade, attempt history, teacher inbox)
+- AI assignment drafts (teacher review required, never auto-published)
+- AI grading suggestions (approve/modify/reject; AI never finalizes)
 
 Phases 3–10 follow `docs/ROADMAP.md`.
 

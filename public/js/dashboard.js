@@ -34,6 +34,7 @@ const tabs = [
   { id: 'overview', label: 'Dashboard' },
   { id: 'classes', label: 'Classes' },
   { id: 'assignments', label: 'Assignments' },
+  { id: 'quizzes', label: 'Quizzes' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'exams', label: 'Exams' },
   { id: 'invitations', label: 'Invitations' },
@@ -49,12 +50,13 @@ if (!tabs.some((t) => t.id === current)) current = 'overview';
 let openClassId = params.get('class') || null;
 let openAssignmentId = params.get('open') || null;
 let openExamId = params.get('exam') || null;
+let openQuizId = params.get('quiz') || null;
 
 function renderNav() {
   nav.innerHTML = tabs.map((t) => `<a href="#" data-t="${t.id}" class="${t.id === current ? 'active' : ''}">${esc(t.label)}</a>`).join('');
   nav.querySelectorAll('a').forEach((a) => (a.onclick = (e) => {
     e.preventDefault();
-    current = a.dataset.t; openClassId = null; openAssignmentId = null; openExamId = null; renderNav(); render();
+    current = a.dataset.t; openClassId = null; openAssignmentId = null; openExamId = null; openQuizId = null; renderNav(); render();
   }));
 }
 renderNav();
@@ -119,6 +121,7 @@ async function render() {
   if (current === 'assignments') return renderAssignmentsHome();
   if (current === 'calendar') return renderCalendar();
   if (current === 'exams') return renderExamsHome();
+  if (current === 'quizzes') return renderQuizzesHome();
   if (current === 'invitations') return renderInvitations();
   if (current === 'students') return renderStudents();
   if (current === 'activity') return renderActivity();
@@ -583,6 +586,213 @@ function showEditExam(ex) {
   }).catch((e) => { main.innerHTML = stateRow('error', e.message); });
 }
 
+// ---- AI assignment drafts (Phase 8) ----------------------------------------------------------
+function showAIAssignment(classId) {
+  main.innerHTML = `
+    <section class="card"><h2 style="margin-top:0">AI assignment draft</h2>
+      <p style="color:var(--muted)">AI drafts are never published automatically. Review and edit before publishing.</p>
+      <form id="aig" class="form">
+        <div class="grid cols-3">
+          <label class="field">Subject<input class="input" id="gsub" required maxlength="80"></label>
+          <label class="field">Topic<input class="input" id="gtop" required maxlength="300"></label>
+          <label class="field">Difficulty<select class="input" id="gdif"><option>easy</option><option selected>medium</option><option>hard</option></select></label>
+          <label class="field">Tasks<input class="input" id="gcount" type="number" min="1" max="20" value="5"></label>
+          <label class="field">Type<select class="input" id="gtype"><option value="normal">Normal</option><option value="guided">Guided</option></select></label>
+        </div>
+        <label class="field">Extra instructions<textarea class="input" id="ginst" rows="2" maxlength="2000"></textarea></label>
+        <button class="btn" type="submit" id="gbtn">Generate draft</button>
+      </form><div id="gout" style="margin-top:12px"></div>
+      <button class="btn secondary" id="backA2" style="margin-top:8px">Back</button></section>`;
+  document.getElementById('backA2').onclick = () => showNewAssignment(classId);
+  document.getElementById('aig').onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('gbtn');
+    btn.disabled = true;
+    document.getElementById('gout').innerHTML = stateRow('loading', 'Generating…');
+    try {
+      const { draft } = await api.aiAssignment({
+        subject: document.getElementById('gsub').value,
+        topic: document.getElementById('gtop').value,
+        difficulty: document.getElementById('gdif').value,
+        instructions: document.getElementById('ginst').value,
+        count: Number(document.getElementById('gcount').value) || 5,
+        type: document.getElementById('gtype').value,
+      });
+      document.getElementById('gout').innerHTML = `
+        <label class="field">Title<input class="input" id="dtitle" maxlength="200" value="${esc(draft.title)}"></label>
+        <label class="field">Description<textarea class="input" id="ddesc" rows="2" maxlength="5000">${esc(draft.description)}</textarea></label>
+        <label class="field">Instructions<textarea class="input" id="dinst" rows="4" maxlength="5000">${esc(draft.instructions)}</textarea></label>
+        <div style="display:flex;gap:8px"><button class="btn" id="useDraft">Review & publish</button>
+        <button class="btn secondary" id="regen">Regenerate</button></div>`;
+      document.getElementById('useDraft').onclick = () => showNewAssignment(classId, {
+        ai: true, draft: true, title: document.getElementById('dtitle').value,
+        description: document.getElementById('ddesc').value, instructions: document.getElementById('dinst').value,
+        type: document.getElementById('gtype').value,
+      });
+      document.getElementById('regen').onclick = () => document.getElementById('aig').requestSubmit();
+    } catch (err) {
+      document.getElementById('gout').innerHTML = stateRow('error', err.message);
+    } finally { btn.disabled = false; }
+  };
+}
+
+// ---- Quizzes + AI quiz generator (Phase 8) --------------------------------------------------
+async function renderQuizzesHome() {
+  if (openQuizId) return renderQuizDetail(openQuizId);
+  main.innerHTML = stateRow('loading', 'Loading quizzes…');
+  try {
+    const { personal, class: classQ } = await api.quizzesList();
+    main.innerHTML = `
+      <section class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div><h2 style="margin:0">Quizzes</h2>
+        <p style="color:var(--muted);margin:0">AI-generated practice is private to you unless a teacher publishes it.</p></div>
+        <div style="flex:1"></div>
+        <button class="btn" id="genQ">Generate with AI</button>
+      </section>
+      <section class="card"><h3 style="margin-top:0">My practice quizzes (${personal.length})</h3>
+        ${personal.length ? `<div class="table-wrap"><table><tbody>
+        ${personal.map((q) => `<tr><td>${esc(q.title)}<br><small style="color:var(--muted)">${esc(q.topic || '')} · ${esc(q.difficulty)} · ${esc(q.source)}</small></td>
+        <td><button class="btn secondary" data-quiz="${esc(q.id)}">Open</button></td></tr>`).join('')}</tbody></table></div>`
+        : stateRow('empty', 'No personal quizzes. Generate one with AI.')}</section>
+      <section class="card"><h3 style="margin-top:0">Class quizzes (${classQ.length})</h3>
+        ${classQ.length ? `<div class="table-wrap"><table><tbody>
+        ${classQ.map((q) => `<tr><td>${esc(q.title)} ${q.status !== 'published' ? '<span class="badge">draft</span>' : ''}<br><small style="color:var(--muted)">${esc(q.topic || '')} · ${esc(q.difficulty)}</small></td>
+        <td><button class="btn secondary" data-quiz="${esc(q.id)}">Open</button></td></tr>`).join('')}</tbody></table></div>`
+        : stateRow('empty', 'No class quizzes yet.')}</section>`;
+    main.querySelectorAll('[data-quiz]').forEach((b) => (b.onclick = () => { openQuizId = b.dataset.quiz; render(); }));
+    document.getElementById('genQ').onclick = showAIQuiz;
+  } catch (e) { main.innerHTML = stateRow('error', e.message); }
+}
+
+function showAIQuiz() {
+  api.list().then(({ classes }) => {
+    const teach = (profile.role === 'teacher' || profile.role === 'admin');
+    main.innerHTML = `
+      <section class="card"><h2 style="margin-top:0">AI quiz generator</h2>
+        <form id="qg" class="form">
+          <div class="grid cols-3">
+            <label class="field">Subject<input class="input" id="qsub" required maxlength="80"></label>
+            <label class="field">Topic<input class="input" id="qtop" required maxlength="300"></label>
+            <label class="field">Difficulty<select class="input" id="qdif"><option>easy</option><option selected>medium</option><option>hard</option></select></label>
+            <label class="field">Questions<input class="input" id="qcount" type="number" min="1" max="20" value="5"></label>
+            <label class="field">Save to${teach ? '<select class="input" id="qcls"><option value="">Personal (only me)</option>' + classes.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('') + '</select>' : '<input class="input" value="Personal (only you)" disabled>'}</label>
+          </div>
+          <div style="display:flex;gap:12px;font-size:14px">
+            <label><input type="checkbox" id="kMcq" checked> MCQ</label>
+            <label><input type="checkbox" id="kShort"> Short answer</label>
+            <label><input type="checkbox" id="kEssay"> Essay</label>
+          </div>
+          <button class="btn" type="submit" id="qbtn">Generate</button>
+        </form><div id="qout" style="margin-top:12px"></div>
+        <button class="btn secondary" id="backQ" style="margin-top:8px">Back</button></section>`;
+    document.getElementById('backQ').onclick = () => render();
+    let draft = null;
+    document.getElementById('qg').onsubmit = async (e) => {
+      e.preventDefault();
+      const kinds = ['mcq', 'short', 'essay'].filter((k, i) => [document.getElementById('kMcq'), document.getElementById('kShort'), document.getElementById('kEssay')][i].checked);
+      if (!kinds.length) { toast('Pick at least one question type.'); return; }
+      const btn = document.getElementById('qbtn');
+      btn.disabled = true;
+      document.getElementById('qout').innerHTML = stateRow('loading', 'Generating…');
+      try {
+        const clsSel = document.getElementById('qcls');
+        const body = {
+          subject: document.getElementById('qsub').value, topic: document.getElementById('qtop').value,
+          difficulty: document.getElementById('qdif').value, count: Number(document.getElementById('qcount').value) || 5, kinds,
+        };
+        if (clsSel && clsSel.value) body.class_id = clsSel.value;
+        ({ draft } = await api.aiQuiz(body));
+        renderQuizDraft(draft, clsSel && clsSel.value);
+      } catch (err) {
+        document.getElementById('qout').innerHTML = stateRow('error', err.message);
+      } finally { btn.disabled = false; }
+    };
+  }).catch((e) => { main.innerHTML = stateRow('error', e.message); });
+}
+
+function renderQuizDraft(draft, classId) {
+  const box = document.getElementById('qout');
+  box.innerHTML = `
+    <label class="field">Title<input class="input" id="dtitle" maxlength="200" value="${esc(draft.title)}"></label>
+    <div id="dq">${draft.questions.map((q, i) => `
+      <div class="card" data-q="${i}" style="margin-top:8px"><b>Q${i + 1} (${esc(q.kind)}, ${q.points} pts)</b>
+      <p>${esc(q.prompt)}</p>
+      ${q.kind === 'mcq' ? `<div>${q.options.map((o) => `<div>○ ${esc(o)}${o === q.answer ? ' <b>(correct)</b>' : ''}</div>`).join('')}</div>` : `<p style="color:var(--muted)">Model answer: ${esc(q.answer || '—')}</p>`}
+      <button class="btn ghost" data-rm="${i}">Remove</button></div>`).join('')}</div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn" id="saveQ">Save quiz</button>
+    <button class="btn secondary" id="regenQ">Regenerate</button></div>`;
+  box.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => {
+    draft.questions.splice(Number(b.dataset.rm), 1);
+    renderQuizDraft(draft, classId);
+  }));
+  document.getElementById('regenQ').onclick = () => document.getElementById('qg').requestSubmit();
+  document.getElementById('saveQ').onclick = async () => {
+    if (!draft.questions.length) { toast('Remove left no questions.'); return; }
+    try {
+      const { quiz } = await api.quizSave({
+        title: document.getElementById('dtitle').value || draft.title,
+        topic: draft.topic, difficulty: draft.difficulty, source: 'ai',
+        class_id: classId || null, status: classId ? 'draft' : 'personal', questions: draft.questions,
+      });
+      toast(classId ? 'Saved as class draft. Publish from the quiz page.' : 'Saved to your practice quizzes.');
+      openQuizId = quiz.id;
+      render();
+    } catch (err) { toast(err.message); }
+  };
+}
+
+async function renderQuizDetail(id) {
+  main.innerHTML = stateRow('loading', 'Loading quiz…');
+  try {
+    const { quiz, questions, canEdit } = await api.quizDetail(id);
+    const { attempts } = await api.quizAttempts(id);
+    const isTeacher = canEdit && quiz.class_id;
+    main.innerHTML = `
+      <section class="card">
+        <button class="btn ghost" id="backZ">← Quizzes</button>
+        <h2 style="margin:8px 0 4px">${esc(quiz.title)}</h2>
+        <p style="color:var(--muted);margin:0">${esc(quiz.topic || '')} · ${esc(quiz.difficulty)} · ${esc(quiz.source)} · ${esc(quiz.status)} · ${questions.length} questions</p>
+        ${isTeacher && quiz.status !== 'published' ? '<button class="btn" id="pubQ" style="margin-top:8px">Publish to class</button>' : ''}
+        ${canEdit ? '<button class="btn danger" id="delQ" style="margin-top:8px">Delete</button>' : ''}
+      </section>
+      <section class="card"><h3 style="margin-top:0">${isTeacher ? 'Answer key' : 'Take quiz'}</h3>
+        <form id="takeF" class="form">
+        ${questions.map((q, i) => `<div><b>Q${i + 1} (${q.points} pts)</b><p>${esc(q.prompt)}</p>
+        ${q.kind === 'mcq' ? (isTeacher
+          ? q.options.map((o) => `<div>○ ${esc(o)}${o === q.answer ? ' <b>(correct)</b>' : ''}</div>`).join('')
+          : q.options.map((o) => `<label style="display:block;font-weight:normal"><input type="radio" name="a_${esc(q.id)}" value="${esc(o)}" required> ${esc(o)}</label>`).join(''))
+        : (isTeacher ? `<p style="color:var(--muted)">Model answer: ${esc(q.answer || '—')}</p>` : `<textarea class="input" name="a_${esc(q.id)}" rows="3" maxlength="5000"></textarea>`)}</div>`).join('')}
+        ${isTeacher ? '' : '<button class="btn" type="submit">Submit answers</button>'}
+        </form><div id="takeOut" style="margin-top:8px"></div></section>
+      <section class="card"><h3 style="margin-top:0">${isTeacher ? 'Attempts' : 'My attempts'}</h3>
+        ${attempts.length ? `<div class="table-wrap"><table><thead><tr>${isTeacher ? '<th>Student</th>' : ''}<th>Score</th><th>When</th></tr></thead><tbody>
+        ${attempts.map((a) => `<tr>${isTeacher ? `<td>${esc(a.student?.full_name || a.student?.email || '')}</td>` : ''}<td><b>${esc(String(a.score))}</b> / ${esc(String(a.max_points))}</td><td>${esc(new Date(a.submitted_at).toLocaleString())}</td></tr>`).join('')}
+        </tbody></table></div>
+        <p style="color:var(--muted);font-size:13px">MCQ auto-graded. Written answers need teacher review.</p>` : stateRow('empty', 'No attempts yet.')}</section>`;
+    document.getElementById('backZ').onclick = () => { openQuizId = null; render(); };
+    document.getElementById('pubQ')?.addEventListener('click', async () => {
+      try { await api.quizUpdate(id, { status: 'published' }); toast('Published to class.'); render(); }
+      catch (e) { toast(e.message); }
+    });
+    document.getElementById('delQ')?.addEventListener('click', async () => {
+      if (!confirm('Delete this quiz?')) return;
+      try { await api.quizDelete(id); toast('Deleted.'); openQuizId = null; render(); }
+      catch (e) { toast(e.message); }
+    });
+    document.getElementById('takeF')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const answers = {};
+      questions.forEach((q) => { answers[q.id] = fd.get('a_' + q.id) || ''; });
+      try {
+        const { attempt } = await api.quizSubmit(id, answers);
+        document.getElementById('takeOut').innerHTML = `<div class="alert ok"><b>Score: ${esc(String(attempt.score))} / ${esc(String(attempt.max_points))}</b> (MCQ portion; written answers pending review)</div>`;
+        toast('Attempt submitted.');
+      } catch (err) { toast(err.message); }
+    });
+  } catch (e) { main.innerHTML = stateRow('error', e.message); }
+}
+
 // ---- Invitations -------------------------------------------------------------
 async function renderInvitations() {
   main.innerHTML = stateRow('loading', 'Loading invitations…');
@@ -708,26 +918,29 @@ async function loadClassAssignments(classId, isStaff) {
   } catch (e) { box.innerHTML = stateRow('error', e.message); }
 }
 
-function showNewAssignment(classId) {
+function showNewAssignment(classId, preset = null) {
+  const p = preset || {};
   main.innerHTML = `
-    <section class="card"><h2 style="margin-top:0">New assignment</h2>
+    <section class="card"><h2 style="margin-top:0">New assignment ${p.ai ? '<span class="badge">AI draft — review before publishing</span>' : ''}</h2>
+      ${can('assignment.create') ? '<button class="btn secondary" id="aiGen" style="margin-bottom:12px">Generate draft with AI</button>' : ''}
       <form id="af" class="form">
-        <label class="field">Title<input class="input" id="atitle" required minlength="3" maxlength="200"></label>
+        <label class="field">Title<input class="input" id="atitle" required minlength="3" maxlength="200" value="${esc(p.title || '')}"></label>
         <div class="grid cols-3">
-          <label class="field">Type<select class="input" id="atype"><option value="normal">Normal (file upload)</option><option value="guided">Guided (written + file)</option></select></label>
-          <label class="field">Status<select class="input" id="astatus"><option value="published">Published</option><option value="draft">Draft</option></select></label>
+          <label class="field">Type<select class="input" id="atype"><option value="normal" ${p.type === 'normal' ? 'selected' : ''}>Normal (file upload)</option><option value="guided" ${p.type === 'guided' ? 'selected' : ''}>Guided (written + file)</option></select></label>
+          <label class="field">Status<select class="input" id="astatus"><option value="published">Published</option><option value="draft" ${p.draft ? 'selected' : ''}>Draft</option></select></label>
           <label class="field">Max points<input class="input" id="apoints" type="number" min="1" max="1000" value="100"></label>
         </div>
         <div class="grid cols-2">
           <label class="field">Due date (optional)<input class="input" id="adue" type="datetime-local"></label>
           <label class="field">Late submissions<select class="input" id="alate"><option value="no">Not allowed</option><option value="yes">Allowed</option></select></label>
         </div>
-        <label class="field">Description<textarea class="input" id="adesc" rows="2" maxlength="5000"></textarea></label>
-        <label class="field">Instructions<textarea class="input" id="ainst" rows="3" maxlength="5000"></textarea></label>
+        <label class="field">Description<textarea class="input" id="adesc" rows="2" maxlength="5000">${esc(p.description || '')}</textarea></label>
+        <label class="field">Instructions<textarea class="input" id="ainst" rows="3" maxlength="5000">${esc(p.instructions || '')}</textarea></label>
         <div style="display:flex;gap:8px"><button class="btn" type="submit">Create</button>
         <button class="btn secondary" type="button" id="cancel">Cancel</button></div>
       </form></section>`;
   document.getElementById('cancel').onclick = () => render();
+  document.getElementById('aiGen')?.addEventListener('click', () => showAIAssignment(classId));
   document.getElementById('af').onsubmit = async (e) => {
     e.preventDefault();
     try {
@@ -828,9 +1041,25 @@ async function renderAssignmentDetail(id) {
 async function renderSubmissionsTable(a) {
   const box = document.getElementById('roleSection');
   try {
-    const [{ submissions }, { grades }] = await Promise.all([api.submissions(a.id), api.grades(a.id)]);
+    const [{ submissions }, { grades }, { suggestions }] = await Promise.all([
+      api.submissions(a.id), api.grades(a.id), api.aiSuggestions(a.id).catch(() => ({ suggestions: [] })),
+    ]);
     const gMap = Object.fromEntries((grades || []).map((g) => [g.student_id, g]));
     box.innerHTML = `<section class="card"><h3 style="margin-top:0">Submissions (${submissions.length})</h3>
+      ${suggestions.length ? `<h4>AI suggestions awaiting your decision (${suggestions.length})</h4>
+      ${(suggestions || []).map((s) => `
+        <div class="card" data-sug="${esc(s.id)}" style="margin-bottom:8px">
+          <b>Suggested: ${esc(String(s.suggested_score))} / ${esc(String(a.max_points))}</b>
+          <span class="badge">confidence: ${esc(s.confidence)}</span>
+          <p>${esc(s.suggested_feedback)}</p>
+          <p style="color:var(--muted);font-size:13px">Criteria: ${esc(s.criteria || '—')}</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn secondary" data-approve="${esc(s.id)}">Approve</button>
+            <input class="input" style="width:90px" type="number" min="0" max="${esc(String(a.max_points))}" data-mscore="${esc(s.id)}" value="${esc(String(s.suggested_score))}" aria-label="Modified score">
+            <input class="input" style="flex:1;min-width:160px" data-mfb="${esc(s.id)}" maxlength="2000" value="${esc(s.suggested_feedback)}" aria-label="Modified feedback">
+            <button class="btn secondary" data-modify="${esc(s.id)}">Modify & save</button>
+            <button class="btn ghost" data-reject="${esc(s.id)}">Reject</button>
+          </div></div>`).join('')}` : ''}
       ${submissions.length ? `<div class="table-wrap"><table><thead><tr><th>Student</th><th>Status</th><th>Answer</th><th>Files</th><th>Grade / ${esc(String(a.max_points))}</th><th></th></tr></thead><tbody>
       ${submissions.map((s) => { const g = gMap[s.student_id]; return `<tr><td>${esc(s.student?.full_name || s.student?.email || '—')}</td>
       <td><span class="badge ${s.status === 'late' ? 'warn' : s.status === 'graded' ? 'success' : ''}">${esc(s.status)}</span></td>
@@ -838,8 +1067,34 @@ async function renderSubmissionsTable(a) {
       <td>${(s.files || []).map((f) => f.downloadUrl ? `<a href="${esc(f.downloadUrl)}" target="_blank" rel="noopener">${esc(f.name)}</a>` : esc(f.name)).join('<br>') || '—'}</td>
       <td><input class="input" style="width:80px" type="number" min="0" max="${esc(String(a.max_points))}" step="0.5" data-score="${esc(s.student_id)}" value="${g ? esc(String(g.score)) : ''}" aria-label="Score">
       <input class="input" style="margin-top:4px;min-width:140px" data-fb="${esc(s.student_id)}" maxlength="2000" placeholder="Feedback" value="${g ? esc(g.feedback || '') : ''}" aria-label="Feedback"></td>
-      <td><button class="btn secondary" data-grade="${esc(s.student_id)}">Save</button></td></tr>`; }).join('')}</tbody></table></div>
-      <p style="color:var(--muted);font-size:13px">Grades are manual in this phase. AI-assisted grading arrives in Phase 8 with teacher approval.</p>` : stateRow('empty', 'No submissions yet.')}</section>`;
+      <td><button class="btn secondary" data-grade="${esc(s.student_id)}">Save</button>
+      <button class="btn ghost" data-ai="${esc(s.student_id)}" title="Get AI suggestion">AI</button></td></tr>`; }).join('')}</tbody></table></div>
+      <p style="color:var(--muted);font-size:13px">Grades are manual unless you approve an AI suggestion. AI never finalizes grades.</p>` : stateRow('empty', 'No submissions yet.')}</section>`;
+    box.querySelectorAll('[data-approve]').forEach((b) => (b.onclick = async () => {
+      b.disabled = true;
+      try { await api.aiResolve(b.dataset.approve, { decision: 'approve' }); toast('AI grade approved.'); render(); }
+      catch (e) { toast(e.message); b.disabled = false; }
+    }));
+    box.querySelectorAll('[data-modify]').forEach((b) => (b.onclick = async () => {
+      b.disabled = true;
+      try {
+        await api.aiResolve(b.dataset.modify, {
+          decision: 'modify',
+          score: Number(box.querySelector(`[data-mscore="${CSS.escape(b.dataset.modify)}"]`).value),
+          feedback: box.querySelector(`[data-mfb="${CSS.escape(b.dataset.modify)}"]`).value,
+        });
+        toast('Modified grade saved.'); render();
+      } catch (e) { toast(e.message); b.disabled = false; }
+    }));
+    box.querySelectorAll('[data-reject]').forEach((b) => (b.onclick = async () => {
+      try { await api.aiResolve(b.dataset.reject, { decision: 'reject' }); toast('Suggestion rejected.'); render(); }
+      catch (e) { toast(e.message); }
+    }));
+    box.querySelectorAll('[data-ai]').forEach((b) => (b.onclick = async () => {
+      b.disabled = true;
+      try { await api.aiGrade({ assignment_id: a.id, student_id: b.dataset.ai }); toast('AI suggestion ready.'); render(); }
+      catch (e) { toast(e.message); b.disabled = false; }
+    }));
     box.querySelectorAll('[data-grade]').forEach((b) => (b.onclick = async () => {
       const sid = b.dataset.grade;
       const score = box.querySelector(`[data-score="${CSS.escape(sid)}"]`).value;
