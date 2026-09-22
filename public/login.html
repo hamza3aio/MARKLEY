@@ -15,7 +15,7 @@
 <div class="card">
 <h1 style="margin-top:0">Sign in</h1>
 <div id="err"></div>
-<form id="loginForm" class="form">
+<form id="loginForm" class="form" onsubmit="return window.__markleyLoginReady === true">
 <label class="field">Email<input class="input" id="email" type="email" required autocomplete="email"></label>
 <label class="field">Password<input class="input" id="password" type="password" required autocomplete="current-password"></label>
 <button class="btn" type="submit" id="btn">Sign in</button>
@@ -25,6 +25,14 @@
 </div>
 </main>
 <div id="toasts"></div>
+<script>
+window.__markleyLoginReady = false;
+setTimeout(function () {
+  if (!window.__markleyLoginReady) {
+    document.getElementById('err').innerHTML = '<div class="alert error">Sign-in scripts failed to load (network or ad-blocker blocking the login libraries?). Reload the page — if it persists, press F12, open Console, and send the red error text.</div>';
+  }
+}, 6000);
+</script>
 <script type="module">
 import { signIn } from '/js/auth.js';
 import { getSupabase } from '/js/supabase-client.js';
@@ -38,7 +46,10 @@ function safeNext() {
 getSupabase().then(async (sb) => {
   const { data } = await sb.auth.getSession();
   if (data.session) location.href = safeNext();
+}).catch((err) => {
+  document.getElementById('err').innerHTML = `<div class="alert error">${err.message}</div>`;
 });
+window.__markleyLoginReady = true;
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = document.getElementById('btn');

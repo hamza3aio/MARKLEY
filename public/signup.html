@@ -13,7 +13,7 @@
 <div class="card">
 <h1 style="margin-top:0">Create pending account</h1>
 <div id="err"></div><div id="ok"></div>
-<form id="f" class="form">
+<form id="f" class="form" onsubmit="return window.__markleyLoginReady === true">
 <label class="field">Full name<input class="input" id="name" required maxlength="120" autocomplete="name"></label>
 <label class="field">Email<input class="input" id="email" type="email" required autocomplete="email"></label>
 <label class="field">Password<input class="input" id="pw" type="password" required minlength="8" autocomplete="new-password"></label>
@@ -24,11 +24,20 @@
 </div>
 </main>
 <div id="toasts"></div>
+<script>
+window.__markleyLoginReady = false;
+setTimeout(function () {
+  if (!window.__markleyLoginReady) {
+    document.getElementById('err').innerHTML = '<div class="alert error">Scripts failed to load. Reload the page — if it persists, press F12, open Console, and send the red error text.</div>';
+  }
+}, 6000);
+</script>
 <script type="module">
 import { signUp } from '/js/auth.js';
 import { toast } from '/js/ui.js';
 import { initTheme } from '/js/app.js';
 initTheme();
+window.__markleyLoginReady = true;
 document.getElementById('f').addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = document.getElementById('btn');
