@@ -36,6 +36,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# standalone game engine (own repo: hamza3aio/markley-3d-engine)
+/game-engine
+
+# standalone game (own repo: hamza3aio/undercity)
+/undercity
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireViewer } from "@/lib/auth";
 import { signOutAction } from "@/app/login/actions";
 import { NotificationsBell } from "./notifications-bell";
+import { ThemeApplier } from "./theme";
 
 const TABS = [
   { id: "overview", label: "Dashboard", href: "/dashboard", roles: ["admin", "teacher", "assistant", "student", "parent"] },
@@ -24,6 +25,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <>
+      <ThemeApplier theme={viewer.profile.theme ?? null} />
       <header className="topbar">
         <div className="topbar-inner">
           <Link className="brand" href="/dashboard"><span className="brand-mark">M</span> Markley</Link>

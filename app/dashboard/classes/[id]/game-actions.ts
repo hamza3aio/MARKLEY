@@ -36,28 +36,45 @@ export async function getGameData(classId: string): Promise<GameData> {
   const admin = createAdminClient();
   const access = await getClassAccess(admin, viewer, classId);
   if (!access) throw new Error("Class not found.");
-  const { data: rules } = await admin.from("point_rules").select("*").eq("class_id", classId).order("created_at", { ascending: true });
   const staffView = isAdmin(viewer) || access.cls.teacher_id === viewer.id ||
     (access.member && (access.member.role_in_class === "teacher" || access.member.role_in_class === "assistant"));
 
-  const { data: students } = await admin.from("class_members").select("user_id").eq("class_id", classId).eq("role_in_class", "student").eq("status", "active").limit(500);
-  const sids = ((students ?? []) as { user_id: string }[]).map((s) => s.user_id);
-  const { data: pointRows } = sids.length
-    ? await admin.from("points").select("user_id,points").eq("class_id", classId).in("user_id", sids).limit(5000)
-    : { data: [] };
-  const totals: Record<string, number> = {};
-  ((pointRows ?? []) as { user_id: string; points: number }[]).forEach((r) => { totals[r.user_id] = (totals[r.user_id] || 0) + Number(r.points); });
+  const [rulesRes, studentsRes, catalogueRes, linksRes] = await Promise.all([
+    admin.from("point_rules").select("*").eq("class_id", classId).order("created_at", { ascending: true }),
+    admin.from("class_members").select("user_id").eq("class_id", classId).eq("role_in_class", "student").eq("status", "active").limit(500),
+    admin.from("achievements").select("*"),
+    viewer.profile.role === "parent"
+      ? admin.from("parent_student_links").select("student_id").eq("parent_id", viewer.id).eq("status", "active")
+      : Promise.resolve({ data: [] as { student_id: string }[] }),
+  ]);
+  let rules = (rulesRes.data ?? []) as GameData["rules"];
+  if (!rules.length && (isAdmin(viewer) || access.cls.teacher_id === viewer.id)) {
+    // Self-heal classes created before default rules existed (or outside the UI).
+    const { seedDefaults } = await import("@/lib/points-engine");
+    await seedDefaults(admin, classId, viewer.id);
+    const { data: reseeded } = await admin.from("point_rules").select("*").eq("class_id", classId).order("created_at", { ascending: true });
+    rules = (reseeded ?? []) as GameData["rules"];
+  }
+  const sids = ((studentsRes.data ?? []) as { user_id: string }[]).map((s) => s.user_id);
+  const linked = ((linksRes.data ?? []) as { student_id: string }[]).map((l) => l.student_id);
+  const scopeIds = staffView ? sids : viewer.profile.role === "parent" ? linked : [viewer.id];
 
-  let names: Record<string, string> = {};
-  if (sids.length) {
-    const { data: profs } = await admin.from("profiles").select("id,full_name").in("id", sids);
-    names = Object.fromEntries(((profs ?? []) as { id: string; full_name: string }[]).map((p) => [p.id, p.full_name || "Student"]));
-  }
-  let linked: string[] = [];
-  if (viewer.profile.role === "parent") {
-    const { data: links } = await admin.from("parent_student_links").select("student_id").eq("parent_id", viewer.id).eq("status", "active");
-    linked = ((links ?? []) as { student_id: string }[]).map((l) => l.student_id);
-  }
+  const [pointRowsRes, profsRes, earnedRes] = await Promise.all([
+    sids.length
+      ? admin.from("points").select("user_id,points").eq("class_id", classId).in("user_id", sids).limit(5000)
+      : Promise.resolve({ data: [] as { user_id: string; points: number }[] }),
+    sids.length
+      ? admin.from("profiles").select("id,full_name").in("id", sids)
+      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+    scopeIds.length
+      ? admin.from("student_achievements").select("achievement_code,user_id").eq("class_id", classId).in("user_id", scopeIds).limit(500)
+      : Promise.resolve({ data: [] as { achievement_code: string; user_id: string }[] }),
+  ]);
+  const totals: Record<string, number> = {};
+  ((pointRowsRes.data ?? []) as { user_id: string; points: number }[]).forEach((r) => { totals[r.user_id] = (totals[r.user_id] || 0) + Number(r.points); });
+  const names = Object.fromEntries(
+    ((profsRes.data ?? []) as { id: string; full_name: string }[]).map((p) => [p.id, p.full_name || "Student"])
+  );
   const ranked = sids.map((sid) => ({ user_id: sid, total: totals[sid] || 0 })).sort((a, b) => b.total - a.total);
   const showNames = staffView || access.cls.leaderboard_show_names;
   const entries = ranked.map((r, i) => {
@@ -66,13 +83,9 @@ export async function getGameData(classId: string): Promise<GameData> {
   });
   const mineEntry = entries.find((e) => e.mine && ranked.find((r) => r.user_id === viewer.id && r.total === e.total));
 
-  const { data: catalogue } = await admin.from("achievements").select("*");
-  const scopeIds = staffView ? sids : viewer.profile.role === "parent" ? linked : [viewer.id];
-  const { data: earned } = scopeIds.length
-    ? await admin.from("student_achievements").select("achievement_code,user_id").eq("class_id", classId).in("user_id", scopeIds).limit(500)
-    : { data: [] };
   const counts: Record<string, number> = {};
-  ((earned ?? []) as { achievement_code: string }[]).forEach((e) => { counts[e.achievement_code] = (counts[e.achievement_code] || 0) + 1; });
+  ((earnedRes.data ?? []) as { achievement_code: string }[]).forEach((e) => { counts[e.achievement_code] = (counts[e.achievement_code] || 0) + 1; });
+  const catalogue = catalogueRes.data ?? [];
 
   return {
     rules: (staffView ? (rules ?? []) : (rules ?? []).filter((r) => (r as { active: boolean }).active)) as GameData["rules"],
