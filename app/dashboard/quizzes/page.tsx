@@ -8,15 +8,16 @@ export default async function QuizzesPage() {
   const admin = createAdminClient();
   const { data: memberships } = await admin.from("class_members").select("class_id").eq("user_id", viewer.id).eq("status", "active");
   const cids = [...new Set(((memberships ?? []) as { class_id: string }[]).map((m) => m.class_id))];
-  const { data: personal } = await admin.from("quizzes").select("id,title,topic,difficulty,source,status,created_at").is("class_id", null).eq("created_by", viewer.id).is("deleted_at", null).order("created_at", { ascending: false }).limit(100);
-  let classQ: { id: string; title: string; topic: string; difficulty: string; status: string }[] = [];
-  if (cids.length) {
-    const { data } = await admin.from("quizzes").select("id,title,topic,difficulty,source,status,class_id,created_at").in("class_id", cids).is("deleted_at", null).order("created_at", { ascending: false }).limit(200);
-    classQ = ((data ?? []) as typeof classQ).filter((q) => {
-      if (q.status === "published") return true;
-      return ["teacher", "assistant", "admin"].includes(viewer.profile.role);
-    });
-  }
+  const [{ data: personal }, { data: classRows }] = await Promise.all([
+    admin.from("quizzes").select("id,title,topic,difficulty,source,status,created_at").is("class_id", null).eq("created_by", viewer.id).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
+    cids.length
+      ? admin.from("quizzes").select("id,title,topic,difficulty,source,status,class_id,created_at").in("class_id", cids).is("deleted_at", null).order("created_at", { ascending: false }).limit(200)
+      : Promise.resolve({ data: [] as { id: string; title: string; topic: string; difficulty: string; status: string }[] }),
+  ]);
+  const classQ = ((classRows ?? []) as { id: string; title: string; topic: string; difficulty: string; status: string }[]).filter((q) => {
+    if (q.status === "published") return true;
+    return ["teacher", "assistant", "admin"].includes(viewer.profile.role);
+  });
 
   return (
     <>

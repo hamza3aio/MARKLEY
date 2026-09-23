@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
@@ -19,7 +20,7 @@ export interface Viewer {
   permissions: string[];
 }
 
-export async function getViewer(): Promise<Viewer | null> {
+export const getViewer = cache(async (): Promise<Viewer | null> => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -43,7 +44,7 @@ export async function getViewer(): Promise<Viewer | null> {
     profile: profile as Viewer["profile"],
     permissions: (rows ?? []).map((r) => r.permission),
   };
-}
+});
 
 export async function requireViewer(): Promise<Viewer> {
   const viewer = await getViewer();

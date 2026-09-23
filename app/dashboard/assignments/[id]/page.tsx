@@ -30,21 +30,24 @@ export default async function AssignmentDetail({ params }: { params: Promise<{ i
     downloadUrl: await signedDownload(admin, PURPOSE.assignment.bucket, a.storage_path),
   })));
 
-  let submissionCount: number | undefined;
+  let submissionCount = 0;
   let mySubmission: Record<string, unknown> | null = null;
   let myFiles: Record<string, unknown>[] = [];
   let myGrade: Record<string, unknown> | null = null;
   let submissions: Record<string, unknown>[] = [];
   if (staff) {
-    const { count } = await admin.from("assignment_submissions").select("id", { count: "exact", head: true }).eq("assignment_id", id);
-    submissionCount = count ?? 0;
-    const { data: subs } = await admin.from("assignment_submissions").select("*").eq("assignment_id", id).order("submitted_at", { ascending: false }).limit(200);
-    const sids = [...new Set(((subs ?? []) as Record<string, unknown>[]).map((s) => s.student_id as string))];
-    let profs: Record<string, { full_name?: string; email?: string }> = {};
-    if (sids.length) {
-      const { data } = await admin.from("profiles").select("id,full_name,email").in("id", sids);
-      profs = Object.fromEntries(((data ?? []) as Record<string, unknown>[]).map((p) => [p.id as string, p as never]));
-    }
+    const [{ data: subs }, { data: profiles }] = await (async () => {
+      const s = await admin.from("assignment_submissions").select("*").eq("assignment_id", id).order("submitted_at", { ascending: false }).limit(200);
+      const sids = [...new Set(((s.data ?? []) as Record<string, unknown>[]).map((x) => x.student_id as string))];
+      const p = sids.length
+        ? await admin.from("profiles").select("id,full_name,email").in("id", sids)
+        : { data: [] as Record<string, unknown>[] };
+      return [s, p] as const;
+    })();
+    submissionCount = (subs ?? []).length;
+    const profs: Record<string, { full_name?: string; email?: string }> = Object.fromEntries(
+      ((profiles ?? []) as Record<string, unknown>[]).map((p) => [p.id as string, p as never])
+    );
     submissions = await Promise.all(((subs ?? []) as Record<string, unknown>[]).map(async (s) => {
       const { data: files } = await admin.from("submission_files").select("*").eq("submission_id", s.id as string);
       const withUrls = await Promise.all(((files ?? []) as Record<string, unknown>[]).map(async (f) => ({
@@ -54,14 +57,16 @@ export default async function AssignmentDetail({ params }: { params: Promise<{ i
       return { ...(s as object), student: profs[s.student_id as string] ?? null, files: withUrls };
     }));
   } else if (member?.role_in_class === "student") {
-    const { data: mine } = await admin.from("assignment_submissions").select("*").eq("assignment_id", id).eq("student_id", viewer.id).single();
-    mySubmission = (mine as Record<string, unknown> | null) ?? null;
-    if (mine) {
-      const { data: files } = await admin.from("submission_files").select("*").eq("submission_id", (mine as { id: string }).id);
+    const [mineRes, gradeRes] = await Promise.all([
+      admin.from("assignment_submissions").select("*").eq("assignment_id", id).eq("student_id", viewer.id).single(),
+      admin.from("grades").select("score,max_points,feedback").eq("assignment_id", id).eq("student_id", viewer.id).single(),
+    ]);
+    mySubmission = (mineRes.data as Record<string, unknown> | null) ?? null;
+    myGrade = (gradeRes.data as Record<string, unknown> | null) ?? null;
+    if (mySubmission) {
+      const { data: files } = await admin.from("submission_files").select("*").eq("submission_id", mySubmission.id as string);
       myFiles = (files ?? []) as Record<string, unknown>[];
     }
-    const { data: grade } = await admin.from("grades").select("score,max_points,feedback").eq("assignment_id", id).eq("student_id", viewer.id).single();
-    myGrade = (grade as Record<string, unknown> | null) ?? null;
   }
 
   const due = asg.due_date ? new Date(asg.due_date as string).toLocaleString() : "No due date";

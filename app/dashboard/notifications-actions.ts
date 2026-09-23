@@ -16,9 +16,16 @@ export interface Notification {
 export async function getNotificationsAction(): Promise<{ notifications: Notification[]; unread: number }> {
   const viewer = await requireViewer();
   const admin = createAdminClient();
-  const { data } = await admin.from("notifications").select("*").eq("user_id", viewer.id).order("created_at", { ascending: false }).limit(50);
-  const { count } = await admin.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", viewer.id).is("read_at", null);
-  return { notifications: (data ?? []) as Notification[], unread: count ?? 0 };
+  // Single roundtrip: unread first, so the visible page carries the exact unread count.
+  const { data } = await admin
+    .from("notifications")
+    .select("*")
+    .eq("user_id", viewer.id)
+    .order("read_at", { ascending: true, nullsFirst: true })
+    .order("created_at", { ascending: false })
+    .limit(50);
+  const notes = (data ?? []) as Notification[];
+  return { notifications: notes, unread: notes.filter((n) => !n.read_at).length };
 }
 
 export async function markNotificationsAction(ids: string[] | "all"): Promise<void> {

@@ -18,11 +18,13 @@ export interface AnalyticsRow {
 }
 
 export async function getAnalytics(admin: Admin, viewer: Viewer, classId: string, opts: { from?: string; to?: string; student_id?: string } = {}) {
-  const { data: cls } = await admin.from("classes").select("id,teacher_id").eq("id", classId).is("deleted_at", null).single();
+  const [{ data: cls }, member] = await Promise.all([
+    admin.from("classes").select("id,teacher_id").eq("id", classId).is("deleted_at", null).single(),
+    activeMembership(admin, classId, viewer.id),
+  ]);
   if (!cls) throw new Error("Class not found.");
-  const member = await activeMembership(admin, classId, viewer.id);
   const staff =
-    _isAdmin(viewer) || cls.teacher_id === viewer.id ||
+    _isAdmin(viewer) || (cls as { teacher_id: string }).teacher_id === viewer.id ||
     (!!member && (member.role_in_class === "teacher" || member.role_in_class === "assistant"));
 
   let scopeIds: string[] | null = null;
@@ -35,7 +37,10 @@ export async function getAnalytics(admin: Admin, viewer: Viewer, classId: string
     } else throw new Error("You do not have access to analytics.");
   }
 
-  const { data: students } = await admin.from("class_members").select("user_id").eq("class_id", classId).eq("role_in_class", "student").eq("status", "active").limit(500);
+  const [{ data: students }, { data: assignments }] = await Promise.all([
+    admin.from("class_members").select("user_id").eq("class_id", classId).eq("role_in_class", "student").eq("status", "active").limit(500),
+    admin.from("assignments").select("id,title,type,max_points,created_at").eq("class_id", classId).is("deleted_at", null).eq("status", "published").order("created_at", { ascending: true }).limit(200),
+  ]);
   let sids = ((students ?? []) as { user_id: string }[]).map((s) => s.user_id);
   if (scopeIds) sids = sids.filter((s) => scopeIds!.includes(s));
   if (opts.student_id) {
@@ -43,25 +48,27 @@ export async function getAnalytics(admin: Admin, viewer: Viewer, classId: string
     sids = sids.filter((s) => s === opts.student_id);
   }
   if (!sids.length) return { rows: [] as AnalyticsRow[], assignments: [], summary: null };
-
-  const { data: profs } = await admin.from("profiles").select("id,full_name,email").in("id", sids);
-  const byId = Object.fromEntries(((profs ?? []) as { id: string; full_name: string; email: string }[]).map((p) => [p.id, p]));
-  const { data: assignments } = await admin.from("assignments").select("id,title,type,max_points,created_at").eq("class_id", classId).is("deleted_at", null).eq("status", "published").order("created_at", { ascending: true }).limit(200);
   const aids = ((assignments ?? []) as { id: string }[]).map((a) => a.id);
 
-  let grades: { assignment_id: string; student_id: string; score: number; max_points: number }[] = [];
-  let subs: { assignment_id: string; student_id: string; status: string }[] = [];
-  if (aids.length) {
-    const g = await admin.from("grades").select("assignment_id,student_id,score,max_points").in("assignment_id", aids).in("student_id", sids);
-    grades = (g.data ?? []) as never[];
-    const s = await admin.from("assignment_submissions").select("assignment_id,student_id,status").in("assignment_id", aids).in("student_id", sids);
-    subs = (s.data ?? []) as never[];
-  }
   let attQ = admin.from("attendance").select("student_id,status").eq("class_id", classId).in("student_id", sids).limit(5000);
   if (opts.from) attQ = attQ.gte("date", opts.from);
   if (opts.to) attQ = attQ.lte("date", opts.to);
-  const { data: att } = await attQ;
-  const attRows = (att ?? []) as { student_id: string; status: string }[];
+  const [profsRes, gradesRes, subsRes, attRes] = await Promise.all([
+    admin.from("profiles").select("id,full_name,email").in("id", sids),
+    aids.length
+      ? admin.from("grades").select("assignment_id,student_id,score,max_points").in("assignment_id", aids).in("student_id", sids)
+      : Promise.resolve({ data: [] as never[] }),
+    aids.length
+      ? admin.from("assignment_submissions").select("assignment_id,student_id,status").in("assignment_id", aids).in("student_id", sids)
+      : Promise.resolve({ data: [] as never[] }),
+    attQ,
+  ]);
+  const byId = Object.fromEntries(
+    ((profsRes.data ?? []) as { id: string; full_name: string; email: string }[]).map((p) => [p.id, p])
+  );
+  const grades = (gradesRes.data ?? []) as { assignment_id: string; student_id: string; score: number; max_points: number }[];
+  const subs = (subsRes.data ?? []) as { assignment_id: string; student_id: string; status: string }[];
+  const attRows = (attRes.data ?? []) as { student_id: string; status: string }[];
 
   const rows: AnalyticsRow[] = sids.map((sid) => {
     const g = grades.filter((x) => x.student_id === sid);

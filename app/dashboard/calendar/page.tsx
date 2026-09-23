@@ -28,13 +28,15 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const classIds = await myClassIds(admin, viewer);
   let items: CalItem[] = [];
   if (classIds.length) {
-    const { data: classes } = await admin.from("classes").select("id,name").in("id", classIds);
+    const [{ data: classes }, { data: sessions }, { data: events }, { data: asgs }] = await Promise.all([
+      admin.from("classes").select("id,name").in("id", classIds),
+      admin.from("sessions").select("id,class_id,title,start_at,end_at,meeting_url").in("class_id", classIds).is("deleted_at", null).gte("start_at", from).lte("start_at", to).limit(500),
+      admin.from("calendar_events").select("id,class_id,title,type,start_at,end_at,link").in("class_id", classIds).gte("start_at", from).lte("start_at", to).limit(500),
+      admin.from("assignments").select("id,class_id,title,due_date").in("class_id", classIds).is("deleted_at", null).eq("status", "published").not("due_date", "is", null).gte("due_date", from).lte("due_date", to).limit(500),
+    ]);
     const names = Object.fromEntries(((classes ?? []) as { id: string; name: string }[]).map((c) => [c.id, c.name]));
-    const { data: sessions } = await admin.from("sessions").select("id,class_id,title,start_at,end_at,meeting_url").in("class_id", classIds).is("deleted_at", null).gte("start_at", from).lte("start_at", to).limit(500);
     ((sessions ?? []) as Record<string, string>[]).forEach((s) => items.push({ kind: "session", id: s.id, class_id: s.class_id, class_name: names[s.class_id] ?? "", title: s.title, start: s.start_at, end: s.end_at, link: s.meeting_url ?? "" }));
-    const { data: events } = await admin.from("calendar_events").select("id,class_id,title,type,start_at,end_at,link").in("class_id", classIds).gte("start_at", from).lte("start_at", to).limit(500);
     ((events ?? []) as Record<string, string>[]).forEach((e) => items.push({ kind: e.type === "exam" ? "exam" : "event", id: e.id, class_id: e.class_id, class_name: names[e.class_id] ?? "", title: e.title, start: e.start_at, end: e.end_at, link: e.link ?? "" }));
-    const { data: asgs } = await admin.from("assignments").select("id,class_id,title,due_date").in("class_id", classIds).is("deleted_at", null).eq("status", "published").not("due_date", "is", null).gte("due_date", from).lte("due_date", to).limit(500);
     ((asgs ?? []) as Record<string, string>[]).forEach((a) => items.push({ kind: "deadline", id: a.id, class_id: a.class_id, class_name: names[a.class_id] ?? "", title: `Due: ${a.title}`, start: a.due_date, end: a.due_date, link: "" }));
     items.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
   }

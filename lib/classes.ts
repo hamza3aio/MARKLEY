@@ -68,21 +68,22 @@ export async function getClassAccess(
   viewer: Viewer,
   classId: string
 ): Promise<ClassAccess | null> {
-  const { data: cls } = await admin
-    .from("classes")
-    .select("id,name,subject,description,teacher_id,leaderboard_enabled,leaderboard_show_names,created_at")
-    .eq("id", classId)
-    .is("deleted_at", null)
-    .single();
+  const [{ data: cls }, { data: member }] = await Promise.all([
+    admin
+      .from("classes")
+      .select("id,name,subject,description,teacher_id,leaderboard_enabled,leaderboard_show_names,created_at")
+      .eq("id", classId)
+      .is("deleted_at", null)
+      .single(),
+    admin
+      .from("class_members")
+      .select("id,role_in_class")
+      .eq("class_id", classId)
+      .eq("user_id", viewer.id)
+      .eq("status", "active")
+      .single(),
+  ]);
   if (!cls) return null;
-
-  const { data: member } = await admin
-    .from("class_members")
-    .select("id,role_in_class")
-    .eq("class_id", classId)
-    .eq("user_id", viewer.id)
-    .eq("status", "active")
-    .single();
 
   let parentOk = false;
   if (!member && !_isAdmin(viewer) && viewer.profile.role === "parent") {

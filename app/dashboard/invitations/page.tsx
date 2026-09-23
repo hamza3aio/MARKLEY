@@ -7,30 +7,31 @@ export default async function InvitationsPage() {
   const admin = createAdminClient();
   const myEmail = viewer.profile.email.toLowerCase();
 
-  const { data: mine } = await admin
-    .from("class_invitations")
-    .select("id,class_id,role_in_class,status,expires_at,created_at")
-    .eq("email", myEmail)
-    .eq("status", "pending")
-    .gt("expires_at", new Date().toISOString());
+  const [{ data: mine }, classIds] = await Promise.all([
+    admin
+      .from("class_invitations")
+      .select("id,class_id,role_in_class,status,expires_at,created_at")
+      .eq("email", myEmail)
+      .eq("status", "pending")
+      .gt("expires_at", new Date().toISOString()),
+    (async (): Promise<string[]> => {
+      if (!["teacher", "assistant", "admin"].includes(viewer.profile.role)) return [];
+      if (viewer.profile.role === "admin") {
+        const { data: all } = await admin.from("classes").select("id").is("deleted_at", null).limit(500);
+        return (all ?? []).map((c) => c.id as string);
+      }
+      const { data: ms } = await admin.from("class_members").select("class_id").eq("user_id", viewer.id).eq("status", "active");
+      return [...new Set((ms ?? []).map((m) => m.class_id as string))];
+    })(),
+  ]);
 
   let sent: Record<string, unknown>[] = [];
-  if (["teacher", "assistant", "admin"].includes(viewer.profile.role)) {
-    let classIds: string[] = [];
-    if (viewer.profile.role === "admin") {
-      const { data: all } = await admin.from("classes").select("id").is("deleted_at", null).limit(500);
-      classIds = (all ?? []).map((c) => c.id as string);
-    } else {
-      const { data: ms } = await admin.from("class_members").select("class_id").eq("user_id", viewer.id).eq("status", "active");
-      classIds = [...new Set((ms ?? []).map((m) => m.class_id as string))];
-    }
-    if (classIds.length) {
-      const { data } = await admin.from("class_invitations")
-        .select("id,class_id,email,role_in_class,status,expires_at,created_at")
-        .in("class_id", classIds).eq("status", "pending")
-        .order("created_at", { ascending: false }).limit(200);
-      sent = (data ?? []) as Record<string, unknown>[];
-    }
+  if (classIds.length) {
+    const { data } = await admin.from("class_invitations")
+      .select("id,class_id,email,role_in_class,status,expires_at,created_at")
+      .in("class_id", classIds).eq("status", "pending")
+      .order("created_at", { ascending: false }).limit(200);
+    sent = (data ?? []) as Record<string, unknown>[];
   }
 
   const allIds = [...new Set([...(mine ?? []).map((i) => i.class_id as string), ...sent.map((i) => i.class_id as string)])];

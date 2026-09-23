@@ -26,16 +26,21 @@ export default async function ClassDetailPage({ params }: { params: Promise<{ id
   const editor = isAdmin(viewer) || (owner && (can(viewer, "class.edit") || can(viewer, "class.delete")));
   const inviter =
     isAdmin(viewer) || owner || (member?.role_in_class === "assistant" && can(viewer, "class.invite"));
-  const members = await getMembers(admin, id);
+  const membersPromise = getMembers(admin, id);
+  const filesPromise = listContentFiles(id, member?.role_in_class ?? (isAdmin(viewer) ? "admin" : null), myRole === "parent");
+  const asgPromise = listAssignments(admin, viewer, id);
+  const sessionsPromise = admin.from("sessions").select("id,title,description,start_at,end_at,meeting_url,provider").eq("class_id", id).is("deleted_at", null).order("start_at", { ascending: true }).limit(200);
+  const eventsPromise = admin.from("calendar_events").select("id,title,type,start_at,link").eq("class_id", id).order("start_at", { ascending: true }).limit(200);
+  const [members, files, asgData, sessionsRes, eventsRes] = await Promise.all([
+    membersPromise, filesPromise, asgPromise, sessionsPromise, eventsPromise,
+  ]);
+  const sessions = sessionsRes.data;
+  const events = eventsRes.data;
   const canUpload =
     isAdmin(viewer) || owner ||
     (member?.role_in_class === "assistant" && can(viewer, "content.upload")) ||
     (member?.role_in_class === "teacher" && can(viewer, "content.upload"));
-  const files = await listContentFiles(id, member?.role_in_class ?? (isAdmin(viewer) ? "admin" : null), myRole === "parent");
-  const asgData = await listAssignments(admin, viewer, id);
   const isStaff = ["admin", "teacher", "assistant"].includes(myRole);
-  const { data: sessions } = await admin.from("sessions").select("id,title,description,start_at,end_at,meeting_url,provider").eq("class_id", id).is("deleted_at", null).order("start_at", { ascending: true }).limit(200);
-  const { data: events } = await admin.from("calendar_events").select("id,title,type,start_at,link").eq("class_id", id).order("start_at", { ascending: true }).limit(200);
 
   return (
     <>

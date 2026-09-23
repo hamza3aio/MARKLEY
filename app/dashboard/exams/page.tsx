@@ -14,7 +14,7 @@ export default async function ExamsPage({ searchParams }: { searchParams: Promis
   const page = Math.max(0, parseInt(sp.page ?? "0", 10) || 0);
   const limit = 25;
 
-  const { subjects, boards } = await getExamMeta();
+  const metaPromise = getExamMeta();
   let q = admin.from("exams").select("*", { count: "exact" }).order("year", { ascending: false }).order("created_at", { ascending: false }).range(page * limit, page * limit + limit - 1);
   if (sp.subject) q = q.eq("subject_code", sp.subject);
   if (sp.board) q = q.eq("board_code", sp.board);
@@ -25,7 +25,7 @@ export default async function ExamsPage({ searchParams }: { searchParams: Promis
     const s = sp.search.trim().slice(0, 80);
     q = q.or(`title.ilike.%${s}%,paper.ilike.%${s}%`);
   }
-  const { data: exams, count } = await q;
+  const [{ subjects, boards }, { data: exams, count }] = await Promise.all([metaPromise, q]);
   const total = count ?? 0;
   const pages = Math.max(1, Math.ceil(total / limit));
   const canManage = isAdmin(viewer) || can(viewer, "exams.manage");
